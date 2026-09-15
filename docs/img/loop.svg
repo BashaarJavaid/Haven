@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#5b6b7a"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="220" fill="#fbfaf7"/>
+  <g font-size="15" font-weight="600" fill="#1f2a33" text-anchor="middle">
+    <g>
+      <rect x="20" y="70" width="120" height="60" rx="10" fill="#e8f0f7" stroke="#8fb0c9"/>
+      <text x="80" y="106">OBSERVE</text>
+    </g>
+    <g>
+      <rect x="165" y="70" width="130" height="60" rx="10" fill="#e8f0f7" stroke="#8fb0c9"/>
+      <text x="230" y="106">UNDERSTAND</text>
+    </g>
+    <g>
+      <rect x="320" y="70" width="110" height="60" rx="10" fill="#e8f0f7" stroke="#8fb0c9"/>
+      <text x="375" y="106">PLAN</text>
+    </g>
+    <g>
+      <rect x="455" y="70" width="150" height="60" rx="10" fill="#fdf1e0" stroke="#e0a95a"/>
+      <text x="530" y="98">EVALUATE</text>
+      <text x="530" y="116" font-size="12" font-weight="500">risk band</text>
+    </g>
+    <g>
+      <rect x="630" y="70" width="150" height="60" rx="10" fill="#fdf1e0" stroke="#e0a95a"/>
+      <text x="705" y="98">CHECK</text>
+      <text x="705" y="116" font-size="12" font-weight="500">constitution</text>
+    </g>
+    <g>
+      <rect x="805" y="70" width="110" height="60" rx="10" fill="#e6f4ea" stroke="#7fb58c"/>
+      <text x="860" y="106">ACT</text>
+    </g>
+    <g>
+      <rect x="940" y="70" width="110" height="60" rx="10" fill="#e6f4ea" stroke="#7fb58c"/>
+      <text x="995" y="106">VERIFY</text>
+    </g>
+    <g>
+      <rect x="1075" y="70" width="110" height="60" rx="10" fill="#efe9f7" stroke="#a08cc9"/>
+      <text x="1130" y="106">REMEMBER</text>
+    </g>
+  </g>
+  <g stroke="#5b6b7a" stroke-width="2" fill="none" marker-end="url(#a)">
+    <line x1="140" y1="100" x2="163" y2="100"/>
+    <line x1="295" y1="100" x2="318" y2="100"/>
+    <line x1="430" y1="100" x2="453" y2="100"/>
+    <line x1="605" y1="100" x2="628" y2="100"/>
+    <line x1="780" y1="100" x2="803" y2="100"/>
+    <line x1="915" y1="100" x2="938" y2="100"/>
+    <line x1="1050" y1="100" x2="1073" y2="100"/>
+    <path d="M1130 130 V175 H80 V132"/>
+  </g>
+  <g font-size="12" fill="#5b6b7a" text-anchor="middle">
+    <text x="705" y="52">HIGH → ask · CRITICAL → never autonomous</text>
+    <text x="530" y="52">deterministic, no model</text>
+    <text x="995" y="52">read the world back</text>
+    <text x="1130" y="52">consent-gated</text>
+    <text x="600" y="200">every step is a signed audit row</text>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+# Demo Script (under 3 minutes)
+
+One story, one evening, one household. Every number on screen comes from the cited scenario run (`scenarios/demo-evening.yaml`, seed 20261013) and maps to an audit row. Recorded from the Haven Simulator in Echo Show mode, with one beat in Echo Dot (voice-only) mode to prove voice completeness. The companion app appears in a second window where the constitution and audit trail are shown.
+
+Judges are not required to watch past 3:00 or to run anything, so the video must carry the whole case.
+
+**Rules honored:** no third-party trademarks beyond the sponsor's platform (the car is "the car", the wearable is "your ring"), no copyrighted music, English, project shown functioning on the intended surface, a visible `twin`/`real` badge wherever data is simulated or live.
+
+---
+
+| Time | Beat | On screen | Spoken / captions | What it proves |
+|---|---|---|---|---|
+| 0:00–0:12 | **Thesis** | Title: *Haven — bounded autonomy for the home.* The loop diagram animates: Observe → Understand → Plan → Evaluate Risk → Check Authority → Act → Verify → Remember. | "Today's smart home follows commands. Haven understands household goals, negotiates competing needs, takes safe autonomous action, and knows when it must ask." | Idea, framing |
+| 0:12–0:40 | **Arrival plan** | Simulator (Echo Show). Malik: "Alexa, what's going on tonight?" The plan card renders: parents at 7:00; pre-warm living room to 72 by 6:45; charge home battery 5:30–6:00; hold the car; overnight window 1:00–4:00; estimated savings, peak kWh avoided; `real` badge on prices and weather, `twin` on devices and car. Transcript pane shows the tool calls. | Alexa narrates the headline and three details from `speakable`, then offers Approve / Change / Skip. | Household context, planning across people + energy + calendar, MCP tools, MCP App, explainability, honest data labels |
+| 0:40–0:55 | **Change by voice** | Malik: "Do it, but don't charge the car past 50, I'm not driving tomorrow." The card re-renders; the EV bar moves; savings increase; the constraint appears with provenance "Malik, tonight". | Alexa reads back the change and confirms. | Multi-turn state, coordinator, re-planning, explicit confirmation before commitment |
+| 0:55–1:10 | **Autonomy inside the boundary** | Split: companion app *Constitution* page with `energy.hvac_adjust: auto (66–76 °F, not while someone sleeps)` highlighted; audit trail shows `EXECUTE energy.hvac_adjust living_room 72` and `EXECUTE energy.battery_dispatch charge`. Time-lapse: 5:30 → 6:00; the living room climbs to 72 in the twin. | Caption: "Low-risk actions inside the constitution run on their own. Every one is recorded with the rule that allowed it." | Constitution, risk bands, execution, verify-after-act, audit |
+| 1:10–1:50 | **The interruption** | 6:15. Malik: "Alexa, Dad just called from a new number. He says he's stranded and needs me to send money to a friend." Verification card: claim, `presented number: not one of Dad's verified channels`, signals (unverified channel, urgency, money, third-party recipient), band CRITICAL, `finance.transfer_money: never` cited, recommended: check in with Dad through his own Haven app. Malik: "Verify it." Card shows *check-in sent*. Cut to a phone mock-up: Dad's Haven app shows "Malik is checking you're okay" → taps *I'm fine*. Card: *Verified: Dad is fine. The request did not come from Dad.* | Alexa: "That number isn't one of Dad's verified contacts, and the request combines urgency, money, and a new channel. I've sent Dad a check-in in his own Haven app and can call his verified number." … "Dad confirmed he's fine." | Protect layer from the household graph, never trusting the caller, CRITICAL floor, `never` veto, verification via a verified channel, no money moved |
+| 1:50–2:10 | **Someone at the door (Ring)** | 7:04. Doorbell card: snapshot (Ring sandbox synthetic device, `real` API badge), context "Mom expected 7:00 ± 30 min". Malik: "That's my mom, let her in." Approval card: `security.door_unlock: ask, quorum any adult, auto-relock 10 min`. Malik: "Yes." Audit: `ASK → APPROVED → EXECUTED unlock → EXECUTED relock`. | Alexa reads back "Unlock the front door for 10 minutes for Mom?" and waits for the yes. | Ring integration, ask-mode with quorum, expected-visitor context without face recognition, physical safety clamp |
+| 2:10–2:25 | **Multiplayer constraint (voice-only)** | Switch to Echo Dot mode: no cards. Dad: "Alexa, don't run the dishwasher tonight, I'm working in the kitchen until eleven." Then Malik at 11:30 pm: "Optimize energy tonight." Alexa lists the overnight plan by voice only, ≤ 5 items. Transcript shows the dishwasher moved to 4:30 am with provenance "Dad". | Alexa: "Understood. I'll run the dishwasher after 11 and keep the car in the 1 to 4 am window." | Multi-member coordination, voice-only completeness, provenance |
+| 2:25–2:45 | **Morning scorecard + AWS** | 7:00 am. Malik: "Good morning." Scorecard card: energy saved, peak avoided, automations 7 (5 autonomous, 2 asked, 1 blocked), 1 request verified, 3 plans coordinated; recovery score low (`twin` badge) → "Recovery Morning is ready, want it?" Quick cut: companion app *Constitution → Cedar view*, then the AWS console: AgentCore Policy engine with the compiled policies and a CloudWatch policy decision for last night's unlock; AgentCore Runtime hosting the MCP server; Bedrock. | Caption: "The constitution compiles to Cedar and is enforced a second time at the AWS tool boundary. Haven's numbers come from its own signed audit ledger." | Measurable outcomes, wearable context as preference not diagnosis, AWS Builder: AgentCore Runtime + Gateway + Policy + Memory + Bedrock |
+| 2:45–2:58 | **Close** | Loop diagram again with the eight audit event types lit up in order. Repo URL. "Alexa+ track · Ring track · AWS Builder." | "Haven: understand, act, protect. Within boundaries you wrote." | |
+
+---
+
+## Production notes
+
+- Record the simulator at 1920×1080 with the transcript pane visible; the tool calls are the technical evidence.
+- Use `haven scenario step --to` to pause before each beat; the clock speed is 60× between beats and 1× during speech.
+- Captions for every spoken line (accessibility and judges on mute).
+- Voice: the simulator's TTS for Alexa; the author's own voice for Malik and Dad, or two captioned text turns if preferred.
+- The phone mock-up for Dad's check-in is the companion app in a phone-width browser window.
+- Keep the AWS console cut under 8 seconds; the point is that it exists and matches, not a tour.
+- Export with the scenario run id in the description; the README links the run's audit export so anyone can verify the numbers.
