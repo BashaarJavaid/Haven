@@ -21,15 +21,7 @@ Two-stage judging: Stage One is a pass/fail check that the project fits the trac
 
 ## Optional, worth doing
 
-- [ ] **Friction log entries** (up to 10 percent bonus). Each entry: task attempted, steps, expected vs. actual, severity, workaround, actionable suggestion. Candidates, to be confirmed by what actually happens:
-  - Alexa+ add-on developer access gated to select partners; no simulator access for hackathon participants; had to build an emulated host.
-  - Alexa+ MCP docs: the design-guide pages (display modes, tools/schema/data) referenced from the docs home were not reachable at the linked URLs on 2026-09-15.
-  - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be proactively invoked.
-  - AgentCore Runtime MCP + Alexa's PRM expectations: how the Runtime's `.well-known` path maps to Alexa's discovery.
-  - Cedar temporal policy quotas (25 per engine, 3 operators, 24 h window) versus a constitution's `ask` classes.
-  - Ring sandbox: webhook signature verification details, synthetic device event coverage.
-  - Smartcar sandbox vs. Tesla Fleet API onboarding cost for a non-fleet developer.
-- [ ] **Feature requests** with priority: Alexa+ add-on context in `_meta` (modality, locale, timezone) — Critical; proactive add-on invocation or notifications API — Important; hackathon simulator access — Important; AgentCore Policy natural-language authoring exposed via API for third-party UIs — Nice-to-have.
+- [ ] **Friction log entries** (up to 10 percent bonus) and **feature requests**: maintained continuously in `docs/friction-log.md` (see the rule in `CLAUDE.md`). At submission, copy the entries and requests into the Devpost form.
 
 ---
 

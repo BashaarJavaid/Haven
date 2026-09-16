@@ -19,6 +19,7 @@ Haven — the bounded-autonomy operating system for the home: a permissioned hou
 - `docs/tool-catalog.md` — the MCP tool surface and its contract. Load for MCP server or tool work.
 - `docs/twin-and-scenarios.md` — twin models and the scenario DSL. Load for adapter, twin, or scenario work.
 - `docs/demo-script.md`, `docs/submission.md` — the video and the hackathon checklist. Load for Phase 8 work.
+- `docs/friction-log.md` — every friction point hit with a third-party tool, in Devpost's format, plus feature requests. Append to it as friction happens (see Conventions).
 - `docs/adr/` — one file per decision with rejected alternatives. Load the specific ADR for the component being touched.
 - `ROADMAP.md` — phased build order as a living checklist with `verify:` checks. Check at the start of a session to see what's next; update it as items complete.
 
@@ -42,6 +43,7 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 - **AWS spend is bounded.** Pay-per-use services only; RDS and Runtime are deployed for the judging window and destroyed after. Don't add an always-on AWS resource without asking.
 - **`THREAT_MODEL.md` rows move only when earned.** A row becomes "Yes" when the item that earns it is built and its `verify:` check passes. Claims never outrun code.
 - Relative dates in docs are absolute (`2026-10-23`), never "next week".
+- **Friction log, from day one.** Devpost gives up to a 10 percent bonus for it, so it is the cheapest score in the project. Anyone, human or agent, appends an entry to `docs/friction-log.md` at the moment a third-party tool, API, SDK, doc, or CLI did not do what its docs said, cost more than about 15 minutes, or forced a workaround. Log it then, not at the end of the session, because sessions end without warning. At the end of any task that touched a third-party tool, check whether an entry was earned and add it if missed. Entries are facts from the session with the doc URL and the exact error text; never invented, never padded. Severity: `Blocker`, `Major`, `Minor`.
 
 ## Commands
 
@@ -129,6 +131,7 @@ The author's second standing instruction: **after building a feature, run and ve
 - If something could not be verified (no AWS credentials, no Bedrock access, a service down), say so first and plainly, and mark the item as not done in `ROADMAP.md`.
 - Never write "should work", "is now complete", or tick a roadmap item on the strength of code alone.
 - Report failures faithfully with the output. A failing test reported honestly is progress; a green claim that isn't is a regression.
+- If the task touched a third-party tool, check `docs/friction-log.md`: was an entry earned? Add it before reporting done.
 
 ---
 
