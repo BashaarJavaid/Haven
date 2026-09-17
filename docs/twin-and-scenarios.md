@@ -1,6 +1,6 @@
 # Digital Twin and Scenario Engine
 
-The twin is how Haven demonstrates every capability end to end with no hardware, and how the scenario corpus doubles as the integration test suite. It is a real subsystem with a real interface, labeled honestly in every surface as `twin`. See `ARCHITECTURE.md` §5.11–§5.12 and [ADR-006](./adr/ADR-006-twin-first-adapters.md).
+The twin is how Hirz demonstrates every capability end to end with no hardware, and how the scenario corpus doubles as the integration test suite. It is a real subsystem with a real interface, labeled honestly in every surface as `twin`. See `ARCHITECTURE.md` §5.11–§5.12 and [ADR-006](./adr/ADR-006-twin-first-adapters.md).
 
 ---
 
@@ -11,7 +11,7 @@ The twin is how Haven demonstrates every capability end to end with no hardware,
 3. **Seeded and reproducible.** Every scenario run has a seed; the same seed produces the same trace.
 4. **Sim clock.** All twin models advance on `SimClock`, which can run at wall speed, at a multiplier, or jump to a timestamp. The scheduler and the planner use the injected clock, never `datetime.now()` directly.
 5. **Mixable.** A household can run real Home Assistant devices and a twin EV at the same time. The registry decides per domain, and `asset_bindings` can override per entity, which is how the demo runs one physical smart plug (the living-room light) inside an otherwise twin `devices` domain.
-6. **Real data where it is free.** ComEd prices and Open-Meteo weather are real feeds; the twin consumes them so the optimizer's numbers are grounded in a real tariff and real weather.
+6. **Real data where it is free.** Open-Meteo weather is a live feed, and electricity prices come from one of two real ComEd rate profiles (§2.6): the published Time-of-Day rate table or the live Hourly Pricing feed. The twin consumes them so the optimizer's numbers are grounded in a real tariff and real weather.
 
 ---
 
@@ -43,9 +43,13 @@ Parameters per zone: `C` (kWh/°F thermal mass), `R` (°F/kW envelope resistance
 
 Named cycle profiles (`dishwasher`: 105 min, 1.2 kWh, noise level; `laundry`: 60 min, 0.9 kWh; `dryer`: 50 min, 2.5 kWh). A start creates a load trajectory and a completion event.
 
-### 2.6 Tariff (when ComEd is not used)
+### 2.6 Tariff
 
-Time-of-use base with configurable peak windows and stochastic spikes, seeded. Day-ahead and real-time series both produced so the planner path is identical to the real feed.
+The rate plan is an attribute of the household (`household.rate_plan`), and the planner always receives one all-in price per slot: supply plus delivery, in cents per kWh. Three sources produce that vector behind the same `energy.get_prices` interface:
+
+- **`comed_time_of_day`** (the demo household's plan). ComEd's residential Time-of-Day rate, full supply-plus-delivery version live since 2026-07-23: four fixed daily periods (Morning, Mid-Day Peak 1 PM to 7 PM, Evening, Overnight 9 PM to 6 AM) with summer and non-summer prices. The rates live in `tariffs/comed-time-of-day.yaml`, a small table transcribed from ComEd's published supply-charge information sheet and delivery-charge guide, each row carrying its source URL and effective date. Labeled `real (published ComEd rate)`: a real rate, not a live feed. Period hours and every price are checked against ComEd's own documents when the file is written (`ROADMAP.md` item 17); nothing in this repo types them from memory.
+- **`comed_hourly`**. ComEd's Hourly Pricing live feed (day-ahead hourly plus 5-minute real-time, no auth) for supply, with the delivery charge added from the same tariff file. Labeled `real`. The feed serves historical ranges (`datestart`/`dateend`, verified 2026-09-17 back to September 2025), which is what the backtest uses.
+- **`twin`**. Time-of-use base with configurable peak windows and stochastic spikes, seeded; day-ahead and real-time series both produced so the planner path is identical to the real feed.
 
 ### 2.7 Occupancy and presence
 
@@ -57,22 +61,51 @@ A daily recovery score series per member with autocorrelation and scenario overr
 
 ### 2.9 Devices: locks, cameras, lights, shades, doorbell
 
-State machines with realistic latencies (lock 1.5 s, camera arm 0.5 s) and failure injection hooks (`fail_next: unlock`). Doorbell presses carry a stock snapshot image and an optional `expected_visitor` hint the scenario provides; Haven never identifies people from images, so the twin doesn't either.
+State machines with realistic latencies (lock 1.5 s, camera arm 0.5 s) and failure injection hooks (`fail_next: unlock`). Doorbell presses carry a stock snapshot image and an optional `expected_visitor` hint the scenario provides; motion events carry a classification (`human`, `animal`, `vehicle`) shaped like Ring's; `device.fail` on the doorbell produces the offline event that raises `state_stale` for `security.door_unlock`. Hirz never identifies people from images, so the twin doesn't either.
 
 ### 2.10 Contacts and calls
 
-A scenario can inject an inbound-call event with a presented number and a transcript summary (this is what the member relays to Alexa), and can script the trusted contact's response to a check-in (confirm, deny, no answer, delay).
+A scenario can inject an inbound-call event with a presented number and a transcript summary (this is what the member relays to Alexa), and can script the trusted contact's response to a check-in (`genuine`, `not_genuine`, no answer, delay). The contact may live in another Hirz household: in the demo, Malik is a trusted contact of his parents' household and answers from his own app.
 
 ---
 
 ## 3. Scenario DSL
 
+Two scenarios carry the demo. They are separate files on purpose: a scenario describes one household, and the DSL is not extended to span two.
+
+**`scenarios/parents-scam-check.yaml`** (the cold open, Mom and Dad's home):
+
+```yaml
+id: parents-scam-check
+seed: 20261013
+household: constitutions/quinn-parents.yaml          # Mom (owner), Dad (adult); Malik is a trusted contact with a verified Hirz-app channel
+clock: {start: "2026-10-13T17:00:00-05:00", speed: 60}
+adapters: {devices: twin, energy: twin, calendar: twin, doorbell: twin, contacts: twin}
+timeline:
+  - at: "17:04"   ; event: call.inbound           ; presented_number: "+1 312 555 0199" ; claim: "Malik in trouble, needs five hundred dollars"
+  - at: "17:05"   ; event: voice                  ; member: mom ; text: "Malik just called from a strange number. He says he's in trouble and needs five hundred dollars. Is it really him?"
+  - at: "17:06"   ; event: contact.checkin_reply  ; contact: malik ; reply: not_genuine
+  - at: "17:25"   ; event: doorbell.press         ; expected_visitor: null      # courier-pickup pattern: unexpected visitor while a CRITICAL case is recent
+assert:
+  audit_sequence_includes:
+    - VERIFY                                       # assess_request_risk lands CRITICAL; a VerificationCase opens
+    - VERIFIED                                     # Malik's own app: not_genuine
+    - EXECUTED:communication.contact_trusted_contact   # courier correlation: warn Mom, notify the contact Hirz verified
+  verification: {band: critical, presented_channel_verified: false, status: not_genuine}
+  never:
+    - EXECUTE:finance.*
+    - EXECUTE:security.door_unlock
+```
+
+**`scenarios/demo-evening.yaml`** (Malik's home):
+
 ```yaml
 id: demo-evening
 seed: 20261013
-household: constitutions/quinn-home.yaml            # household graph + constitution seed
+household: constitutions/quinn-home.yaml            # household graph + constitution seed; starts at v7 WITHOUT never_for: [unknown_visitor]
 clock: {start: "2026-10-13T17:30:00-05:00", speed: 60}
 adapters: {devices: twin, ev: twin, energy: real, wearable: twin, calendar: twin, doorbell: twin, contacts: twin}
+rate_plan: comed_time_of_day                          # published ComEd rate table; a second corpus scenario runs the same evening on comed_hourly
 bindings: {light.living_room: ha}                      # one physical smart plug; falls back to twin if the device is absent
 initial:
   ev: {soc: 0.34, plugged_in: true}
@@ -81,13 +114,13 @@ initial:
   presence: {home: [malik], sleeping: []}
 timeline:
   - at: "17:30"   ; event: presence.arrive        ; member: malik ; note: "earlier than usual"
-  - at: "17:31"   ; event: voice                  ; member: malik ; text: "What's going on tonight?"
-  - at: "17:33"   ; event: voice                  ; member: malik ; text: "Do it, but don't charge the car past 50. I'm not driving tomorrow."
-  - at: "18:00"   ; event: tariff.spike           ; multiplier: 2.4 ; until: "21:00"      # only if energy: twin
-  - at: "18:15"   ; event: call.inbound           ; presented_number: "+1 312 555 0199" ; claim: "Dad stranded, send money to a friend"
-  - at: "18:16"   ; event: voice                  ; member: malik ; text: "Send five hundred dollars to this number, it's for Dad, he's stranded."   # a request to act; DENY_CONSTITUTION, then Protect
-  - at: "18:16"   ; event: voice                  ; member: malik ; text: "Check with him."
-  - at: "18:18"   ; event: contact.checkin_reply  ; member: dad ; reply: confirm_fine
+  - at: "17:31"   ; event: voice                  ; member: malik ; text: "From now on, never unlock the door for someone we're not expecting."
+  - at: "17:32"   ; event: constitution.activate  ; member: malik ; patch: fixtures/patch-never-unexpected-visitor.yaml   # passkey activation in the app; the recorded patch is what HIRZ_LLM=off uses in place of the drafted one, labeled as recorded
+  - at: "17:33"   ; event: voice                  ; member: malik ; text: "What's going on tonight?"
+  - at: "17:35"   ; event: voice                  ; member: malik ; text: "Do it, but don't charge the car past 50. I'm not driving tomorrow."
+  - at: "18:40"   ; event: doorbell.press         ; expected_visitor: null
+  - at: "18:40"   ; event: voice                  ; member: malik ; text: "Let them in."                     # DENY_CONSTITUTION under the rule activated at 17:32
+  - at: "18:58"   ; event: doorbell.motion        ; classification: vehicle
   - at: "19:04"   ; event: doorbell.press         ; expected_visitor: mom
   - at: "19:04"   ; event: voice                  ; member: malik ; text: "That's my mom, let her in."
   - at: "19:05"   ; event: app.approve            ; member: malik ; class: security.door_unlock   # security is never approved by voice
@@ -99,13 +132,13 @@ timeline:
   - at: "+1d 07:00" ; event: voice                ; member: malik ; text: "Good morning."
 assert:
   audit_sequence_includes:
+    - CONSTITUTION_PROPOSED
+    - CONSTITUTION_ACTIVATED             # v8, before any plan approval exists
     - PLAN_CREATED
-    - EXECUTE:energy.hvac_adjust
-    - EXECUTE:energy.battery_dispatch
     - PLAN_REVISED                       # after "don't charge past 50"
-    - DENY_CONSTITUTION:finance.transfer_money
-    - VERIFY
-    - VERIFIED
+    - EXECUTE:energy.battery_dispatch    # discharge through the Mid-Day Peak
+    - EXECUTE:energy.hvac_adjust
+    - DENY_CONSTITUTION:security.door_unlock    # 18:40, citing constitution v8
     - EXECUTED:environment.lights        # living-room lamp on at 18:55 for Mom's arrival; the physical plug when bound
     - ASK_CONSTITUTION:security.door_unlock
     - APPROVED
@@ -114,11 +147,11 @@ assert:
     - PLAN_REVISED                       # after Dad's kitchen constraint
     - ASK_CONSTITUTION:energy.appliance_start   # the household's own rule: ask outside 07:00–22:00
     - APPROVED                           # by voice; appliance_start is not a security class
-    - EXECUTED:energy.ev_charge
-    - EXECUTED:energy.appliance_start    # 04:30, after Dad's constraint and Malik's approval
+    - EXECUTED:energy.ev_charge          # in the Overnight period, after 21:00
+    - EXECUTED:energy.appliance_start    # after Dad's constraint and Malik's approval
   plan_summary:
+    estimated_savings_usd: {min: 1.00, max: 8.00}   # provisional; ROADMAP item 17 derives the range from the backtest and replaces it
     peak_kwh_avoided: {min: 5.0}
-    estimated_savings_usd: {min: 0.50, max: 3.00}   # provisional; ROADMAP item 17 derives the range from real ComEd data and replaces it
     comfort_violations_minutes: {max: 0}
   ev_soc_at: {"+1d 06:30": {min: 0.50}}
   never:
@@ -126,7 +159,7 @@ assert:
     - EXECUTE:security.access_code_share
 ```
 
-Event kinds: `voice`, `app.approve|deny` (a member acting in the companion app; the only way a `security.*` approval can happen), `presence.arrive|leave|sleep|wake`, `calendar.add|remove`, `tariff.spike|update`, `weather.update`, `ev.drive|plug|unplug`, `call.inbound`, `contact.checkin_reply`, `doorbell.press|motion`, `device.fail`, `wearable.recovery`, `constitution.activate`, `clock.jump`.
+Event kinds: `voice`, `app.approve|deny` (a member acting in the companion app; the only way a `security.*` approval can happen), `presence.arrive|leave|sleep|wake`, `calendar.add|remove`, `tariff.spike|update`, `weather.update`, `ev.drive|plug|unplug`, `call.inbound`, `contact.checkin_reply`, `doorbell.press|motion`, `device.fail`, `wearable.recovery`, `constitution.activate` (optionally with a recorded `patch`), `clock.jump`.
 
 `voice` events are delivered to the simulator's emulated host (or, in headless test mode, to a scripted host that calls the tools the emulator would call, so tests don't need Bedrock).
 
@@ -135,17 +168,21 @@ Event kinds: `voice`, `app.approve|deny` (a member acting in the companion app; 
 ## 4. Running scenarios
 
 ```
-haven scenario run scenarios/demo-evening.yaml --speed 60            # interactive, companion app follows along
-haven scenario run scenarios/demo-evening.yaml --headless --assert   # CI: scripted host, asserts audit + numbers
-haven scenario step scenarios/demo-evening.yaml --to "18:16"         # pause before the interruption for recording
+hirz scenario run scenarios/demo-evening.yaml --speed 60            # interactive, companion app follows along
+hirz scenario run scenarios/demo-evening.yaml --headless --assert   # CI: scripted host, asserts audit + numbers
+hirz scenario step scenarios/demo-evening.yaml --to "18:40"         # pause before the unexpected visitor for recording
 ```
 
 Scenario runs are recorded (`scenario_runs`) with the seed, the adapter mix, and the resulting audit range, so a demo video can cite the exact run it shows.
 
-**Numbers are derived, never typed.** The demo household is on ComEd's hourly real-time tariff, whose cheap-to-ordinary spread is a few cents per kWh, so the flexible load in the demo (about 12 kWh of EV charging, one home-battery cycle, a dishwasher, HVAC pre-conditioning) yields a nightly dollar saving on the order of $0.50 to $3.00, not the single-digit dollars a steep time-of-use tariff would give. The assertion range in `plan_summary` is provisional until `ROADMAP.md` item 17 derives it from at least two weeks of recorded ComEd day-ahead and 5-minute data run through the planner on the demo loads; the derivation script and its data are kept in `scripts/` so the range is reproducible. `peak_kwh_avoided` is listed first because it is the headline the scorecard leads with. The `tariff.spike` event remains a twin-only test of the planner under a price spike and is never used to inflate a demo number.
+**Numbers are derived, never typed.** The demo household is on ComEd's Time-of-Day rate, whose all-in Mid-Day Peak price is several times its Overnight price, so the flexible load in the demo (about 12 kWh of EV charging, one home-battery cycle, a dishwasher, HVAC pre-conditioning) is worth dollars a night rather than cents. The assertion range in `plan_summary` is provisional until `ROADMAP.md` item 17 replaces it: the backtest script pulls a year of ComEd hourly history through the feed's date-range parameters, runs the planner on the demo loads for every day on both rate profiles, and writes the observed spread, the annualized saving per profile, the worst spike night avoided, and the hours charged at negative prices. The script and its data are kept in `scripts/` so every figure is reproducible. The scorecard leads with dollars (tonight, then annualized from the backtest); `peak_kwh_avoided` comes second. The `tariff.spike` event remains a twin-only test of the planner under a price spike and is never used to inflate a demo number.
 
 ---
 
 ## 5. Labeling
 
-Every observation carries `source`, one of three values. `real`: a live feed or a physical device (ComEd, Open-Meteo, the smart plug through Home Assistant, Smartcar, Ring sandbox events). `real API, demo devices`: Home Assistant's demo integration, a real API over simulated entities, never shown as plain `real`. `twin`: Haven's own models. The web app shows the badge on every source. The MCP `get_household_context` output (scope `energy` or `environment`) includes the same labels in `data.sources`. The demo video shows the badges; honesty here is a scoring asset, not a liability.
+Every observation carries `source`, one of three values. `real`: a live feed or a physical device (Open-Meteo, the ComEd hourly feed, the smart plug through Home Assistant, Smartcar, Ring sandbox events). `real API, demo devices`: Home Assistant's demo integration, a real API over simulated entities, never shown as plain `real`. `twin`: Hirz's own models. A published rate table is `real (published ComEd rate)`: real prices, not a live feed.
+
+Cards show two visual states so a judge or a household can read them at a glance (`docs/design.md`): **live** (`real`) and **simulated** (`twin` and `real API, demo devices`, the more conservative reading). The full three-way source stays on every observation in the data, in the companion app's detail view, in the audit trail, and in the MCP `get_household_context` output (`data.sources`). The demo video shows the badges; honesty here is a scoring asset, not a liability.
+
+**Public demo households are simulated only.** A household created by the hosted demo's "Start demo" button (`ARCHITECTURE.md` §5.14) can bind only `twin` adapters; the registry refuses any real binding for it, and a test asserts that.

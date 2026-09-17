@@ -15,7 +15,7 @@ All notable changes are documented here. The format follows
   `security.*` classes are never approvable by voice (`ask_channels` must exclude `alexa`,
   validator-enforced); `requester.surface` condition attribute; reserved `requested_by.speaker`
   hook that can only lower authority; demo and scenario approve the unlock in the companion app.
-- 2026-09-16: Positioning relative to the field: README "Why" and "What Haven adds" (constitution
+- 2026-09-16: Positioning relative to the field: README "Why" and "What Hirz adds" (constitution
   compiled to Cedar and enforced twice, planner over real prices, multi-member provenance,
   verification from the household's records) replace the "four innovations" table; the Devpost
   description draft and the demo thesis line lead with the same four. No build scope changed.
@@ -39,7 +39,7 @@ All notable changes are documented here. The format follows
   Gateway, companion API, Ring webhooks, web push), approved by the author. "Act" tools now return
   `status: executing` and the worker executes within seconds, so no tool call waits on the Gateway
   or a third-party network. The tick Lambda targets the worker. Runtime cold start is measured and
-  reported separately from the warm latency budget. Roadmap items 19, 36, 38 and `haven doctor
+  reported separately from the warm latency budget. Roadmap items 19, 36, 38 and `hirz doctor
   --aws` updated; friction-log candidate added.
 - 2026-09-16: Savings numbers made defensible (option A: stay on ComEd real-time pricing). The
   demo assertion range is now provisional ($0.50–$3.00) until roadmap item 17 derives it from at
@@ -64,3 +64,81 @@ All notable changes are documented here. The format follows
   of the video (rule shown at 0:45, asks at 1:55, Cedar at 2:20); this also fixes the script
   contradicting the constitution. Wearable line and AWS console tour cut from the video only;
   console screenshots move to the Devpost gallery. Scenario timeline and assertions updated.
+
+- 2026-09-17: **Design revision after a full critique against the hackathon rules** (four equally
+  weighted criteria; judges may score from the video and description alone). Eleven points were
+  walked one by one with the author and applied in one pass. No code existed, so no code changed.
+  - **Renamed from "Haven" to "Hirz".** Collisions in the project's own category: HAVEN Lock (a
+    smart door-lock company with a published Alexa Skill) and havenos.us (an "intelligent space
+    platform" with a hub and smart locks), while the repository was named HavenOS. "Kahf" was
+    checked and ruled out (Kahf Guard, a family-protection product). For "Hirz" no smart-home,
+    security, or Alexa collision was found; npm and PyPI are free; hirz.ai is a recruiting
+    product in another industry; the author's USPTO search in classes 9 and 42 came back clear on 2026-09-17.
+    Package, CLI, scopes (`hirz:*`), card URIs (`ui://hirz/`), and environment variables
+    (`HIRZ_*`) follow. The GitHub repository (`BashaarJavaid/Hirz`) and the local folder were renamed the same day.
+  - **Pitch and customer.** Tagline "House rules for the AI in your home, and your parents'."
+    Named customer: the family's household manager, responsible for two homes; "rules, not
+    care". README gains "Who it's for" with FTC and AARP figures checked against the primary
+    sources. "Bounded autonomy" stays as the architecture's name for the idea.
+  - **Demo: three beats and a close.** Cold open at the parents' home: Mom asks whether the
+    "Malik" who called for money is real; the check-in lands on Malik's phone. The earlier beat
+    (the owner asking Alexa to send money, refused under a `never` rule) was dropped because it
+    refused something Hirz cannot do. Then one rule proposed by voice, activated on a phone as
+    constitution v8, and enforced an hour later on an unexpected visitor; then the door for Mom.
+    The loop animation, the Dad/dishwasher beat, the standalone Echo Dot beat, the morning beat,
+    and the Cedar thread leave the video only. New scenario `parents-scam-check.yaml`; second
+    seed `constitutions/quinn-parents.yaml`; the demo seed starts without
+    `never_for: [unknown_visitor]`.
+  - **Money.** No money action is offered to the orchestrator; money requests route to
+    `assess_request_risk`. The finance classes stay in the risk table and the constitution for
+    the scam-pattern factor. "Forbid them provably" became "no way to move money, by design".
+  - **Twelfth tool, `propose_household_rule`.** Records the sentence, no model in the call;
+    the worker drafts; activation is passkey-gated in the app. New event `CONSTITUTION_PROPOSED`.
+    A voice proposes, a phone activates.
+  - **Flat action tool.** `execute_household_action` and `evaluate_permission` take a
+    consumer-language `action` enum with flat parameters; internal class names never appear in
+    an input schema. The tool-selection test is the arbiter.
+  - **Energy.** The demo household moves to ComEd's published Time-of-Day rate (reverses the
+    2026-09-16 "stay on real-time pricing" decision); ComEd Hourly stays as the second profile;
+    prices are all-in (supply plus delivery); the backtest pulls a year of hourly history (the
+    feed's date-range parameters were verified on 2026-09-17) and produces every published
+    figure; the scorecard leads with dollars and an annualized figure. Rate values are
+    transcribed from ComEd's own documents when the tariff file is written; none are typed here.
+  - **Design.** New `docs/design.md`: Amazon's add-on design tokens and display modes verbatim,
+    a 768×480 base canvas, one job per card, seven hand-designed screens, three CSS motions,
+    spoken headlines of about 20 words or fewer, two badge states on cards (`live`,
+    `simulated`) with the three-way source kept in data. Tailwind + shadcn/ui for the web app;
+    plain CSS tokens for the cards. The custom `presentation` hint became a simulator switch.
+  - **Hirz Link and signed commands (ADR-009).** The worker no longer holds a Home Assistant
+    token. A home-side agent keeps the token in the house, dials out, and executes only commands
+    signed by a KMS key that only the Gateway's Lambda role may use; write-capable cloud
+    credentials are readable by that role only. New event `LINK_REJECTED`. The lead claim was
+    reworded to exactly this, and local mode is labeled `dogwood-local`, a second evaluator in
+    the same trust domain. ADR-003 and ADR-008 amended.
+  - **ADR-007 corrected.** The Skill bridge does not require an Echo (the developer-console
+    simulator works); the real reasons it is not the primary surface are recorded (no account
+    linking, no visuals, a different model, Skill-style invocation). One five-second read-only
+    clip with a `hirz:read` token, a second-host screenshot, and a forum question to the
+    organizers about toolkit access.
+  - **Ring.** Both tracks entered if the item 34 gate passes (the rules say "Primary
+    Track(s)"). Four event types used instead of one (vehicle/human motion into the visitor
+    context; doorbell offline raising `state_stale` on unlock); a courier-pickup correlation
+    (recent CRITICAL case plus an unexpected visitor → warn and notify the verified contact);
+    the submission text framed in the track's priority categories. A Ring doorbell is bought
+    only if the sandbox gate requires a device.
+  - **Open Source.** `docs/submission.md` had misread the rule: the project must be
+    *additional* to the primary submission. The entry is now a separate repository: an add-on
+    conformance checker first, then the simulator's generic host harness. Dogwood Python
+    bindings are decided after the item 7 gate; the bridge OAuth pull request was skipped.
+  - **Audit anchors.** Chain head to S3 Object Lock (governance mode, worker put-only), hourly
+    and on every constitution activation; `hirz verify-audit --anchors`; new event
+    `AUDIT_ANCHORED`. The threat-model row now says what the chain alone does and does not stop.
+  - **Hosted demo.** A public "Start demo" path seeds a throwaway household restricted to twin
+    adapters, rate-limited, 24-hour lifetime.
+  - **Friction log.** The 2026-09-15 entry about unreachable design-guide links was removed
+    (the pages load; the entry had no URL or status). Candidates added: Home Assistant tokens
+    cannot be scoped; the Skill bridge's missing account linking and visuals.
+  - **Roadmap.** New items 25a, 29a, 33a, 38a, 38b, 38c, 41a; a rewritten cut line with the
+    order in which below-the-line items are let go; Phase 9 gains the caregiver view across
+    homes, the activity-signal idea, and trademark clearance. Approved spend: one KMS key, one
+    S3 bucket, the bridge stack for the recording, and rate-limited Bedrock use by the hosted demo.

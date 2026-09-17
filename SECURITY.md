@@ -2,13 +2,13 @@
 
 ## Status
 
-Haven is pre-1.0 and maintained by a single author. It has not been through an external security audit. It controls physical devices and gates security-relevant actions, so read `THREAT_MODEL.md` before connecting it to anything real. Never connect Haven to life-safety systems.
+Hirz is pre-1.0 and maintained by a single author. It has not been through an external security audit. It controls physical devices and gates security-relevant actions, so read `THREAT_MODEL.md` before connecting it to anything real. Never connect Hirz to life-safety systems.
 
 ## Reporting a vulnerability
 
 **Do not open a public issue for a security bug.**
 
-Use GitHub's private vulnerability reporting on `BashaarJavaid/HavenOS`, or email **aarish@issm.ai**.
+Use GitHub's private vulnerability reporting on `BashaarJavaid/Hirz`, or email **aarish@issm.ai**.
 
 Include the affected component, what an attacker gains, and a reproduction if you have one. Acknowledgement within 7 days; a fix or documented mitigation within 30 days for anything that breaks a guarantee this project actually claims.
 
@@ -21,14 +21,17 @@ In scope:
 - Any path that executes an action without a `Decision` and an audit row, or that bypasses a constitution `never`, a risk floor, or the boundary check.
 - An approval redeemable for an action whose content or context differs from what was approved.
 - Cross-household data access with a valid token for another household.
-- A forged or replayed Ring event that Haven acts on.
-- A way to write to, forge, or silently break the audit chain without detection by `haven verify-audit`.
+- A forged or replayed Ring event that Hirz acts on.
+- A home device acting on a command that the boundary did not sign: an unsigned, tampered, expired, or replayed command accepted by Hirz Link, or any Hirz process outside the home holding a credential that can act on a device in AWS mode.
+- A rule change taking effect from a voice alone, without activation in the companion app.
+- A hosted-demo household reaching a real adapter.
+- A way to write to, forge, or silently break the audit chain without detection by `hirz verify-audit`.
 - Model output influencing a decision (as opposed to narration, drafting, or schema-validated signal extraction).
-- A `Decision` Haven reports that does not match what it enforced.
+- A `Decision` Hirz reports that does not match what it enforced.
 
 Out of scope, per the threat model:
 
-- Anything requiring a compromised Haven host, AWS account, or authorization server.
-- Manipulation of Alexa+'s own orchestrator; Haven treats every tool call as a request from the linked member and gates it accordingly.
+- Anything requiring a compromised Hirz host, AWS account, or authorization server.
+- Manipulation of Alexa+'s own orchestrator; Hirz treats every tool call as a request from the linked member and gates it accordingly.
 - Insider abuse by a legitimate linked adult (attributable after the fact by design, not prevented).
-- Physical identification of people from video or audio (Haven never does this).
+- Physical identification of people from video or audio (Hirz never does this).

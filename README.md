@@ -1,73 +1,104 @@
-# Haven
+# Hirz
 
-**The bounded-autonomy operating system for the home.** Haven turns Alexa+ from a command-driven assistant into a permissioned household agent: it holds a shared model of the people, devices, schedules, energy, and trust relationships in a home, plans against household goals instead of one-off commands, and acts only inside boundaries the household wrote down.
+**House rules for the AI in your home, and your parents'.**
 
-![Haven loop](./docs/img/loop.svg)
+Hirz lets your family decide what Alexa may do on its own, what it must ask about, and what it may never do. It holds a shared model of the people, devices, schedules, energy, and trust relationships in a home, plans against household goals instead of one-off commands, and acts only inside boundaries the household wrote down. The name for that in the architecture docs is *bounded autonomy*.
 
-*Observe → Understand → Plan → Evaluate Risk → Check Authority → Act → Verify → Remember. Every action Haven takes passes through that loop, and every step of it is recorded.*
-
-> Built for the **Build, Ship, Shape: Amazon Developer Hackathon 2026** — Alexa+ track (primary), Ring track (secondary, kept only if the Ring sandbox access gate in `ROADMAP.md` item 34 passes), AWS Builder mini-challenge. Designed as a startup, not a weekend project: see [`ROADMAP.md`](./ROADMAP.md) for the hackathon cut line and what comes after it.
+> Built for the **Build, Ship, Shape: Amazon Developer Hackathon 2026**: Alexa+ track, Ring track (kept only if the Ring sandbox access gate in `ROADMAP.md` item 34 passes), and both mini-challenges, AWS Builder and Open Source. Designed as a startup, not a weekend project: see [`ROADMAP.md`](./ROADMAP.md) for the hackathon cut line and what comes after it.
 
 ---
 
-## Why
+## Who it's for
 
-Today's smart home follows commands. You say "set the thermostat to 72", "charge the car", "remind Mom about her pills", "add milk". The assistant executes each one in isolation. It has no model of who lives in the house, what they need tonight, what electricity costs at 6 PM, which requests are normal and which are dangerous, or how much authority it has been given.
+The family's household manager: the adult who set up the smart home at their own place and at their parents' place, and who carries the worry for both.
 
-Alexa+ can now call third-party tools over MCP, orchestrate multi-turn conversations, and render interactive UI. Household agents built on it already follow a common pattern: an allowlist of actions, a human-approval step for the risky ones, and an audit trail. That pattern is necessary and Haven has it. It is not sufficient, for three reasons:
+- People reported losing **$3.5 billion to imposter scams in 2025**, nearly one in three fraud reports, and nearly three times the 2020 figure ([FTC, 2026-06-15](https://www.ftc.gov/news-events/news/press-releases/2026/06/ftc-data-show-people-reported-losing-3-point-5-billion-imposter-scams-2025)).
+- Fraud losses reported by adults 60 and over rose about fourfold, from about $600 million in 2020 to **$2.4 billion in 2024**, driven largely by losses over $100,000, often to investment scams, romance scams, or impersonations ([FTC, *Protecting Older Consumers 2024–2025*](https://www.ftc.gov/news-events/news/press-releases/2025/12/ftc-issues-annual-report-congress-agencys-actions-protect-older-adults)).
+- **63 million Americans**, about one in four adults, are family caregivers ([AARP and the National Alliance for Caregiving, *Caregiving in the U.S. 2025*](https://www.aarp.org/press/releases/2025-07-24-new-report-reveals-crisis-point-for-americas-63-million-family-caregivers.html)).
 
-1. **The boundary is the developer's, not the household's.** An allowlist is written in code by whoever built the agent. A family that can unlock doors, move money, and change the thermostat while someone sleeps needs to *write* the answer to "how much authority do you have?" themselves, change it, and see proof that it was enforced somewhere the agent cannot reach.
-2. **One user, one command at a time.** Preferences, routines, people, assets, and constraints live in ten apps and nobody's head. Nothing plans across Mom's comfort, the car's deadline, tonight's prices, and Dad's "kitchen is busy until 11" in one decision, with numbers it can defend.
-3. **Trust comes from the caller.** The same channel that takes "turn off the lights" also takes "Dad's stranded, send money to this number". An assistant with no record of who Dad is and how to reach him can only take the caller's word for it.
-
-Haven's thesis is **bounded autonomy**: understand the household, negotiate competing needs, take safe autonomous action inside a boundary the household wrote, and know when to ask.
+An assistant that can unlock doors and change the thermostat while someone sleeps, in a home you are responsible for but do not live in, needs rules you can read and proof they held. Hirz is **rules, not care**: it does not do medication or health monitoring. It gives that person autonomy inside a boundary at home, and protection at their parents'. It also does not stop scam calls. It gives Mom one simple thing to do: *ask first*.
 
 ## What it does
 
-You get home at 5:30 PM.
+5:05 PM, at Mom's.
 
-> **You:** Alexa, what's going on tonight?
+> **Mom:** Alexa, Malik just called from a strange number. He says he's in trouble and needs five hundred dollars. Is it really him?
 >
-> **Alexa (Haven):** You're home earlier than usual. Your parents are coming at 7, the car is at 34 percent, and electricity prices spike at 6. I can pre-warm the living room for your mom, charge the home battery before prices rise, hold the car until the cheap window after midnight, and have everything ready by 7. On your rate the dollar saving is small; the bigger win is keeping the evening peak off the grid, and the numbers are on the card.
+> **Alexa (Hirz):** That number isn't one of Malik's, and this looks like a family-impersonation scam. Don't send anything yet. I'm checking with Malik on his own phone.
 
-The screen shows the plan as a card: each action, when, why, and the numbers. You approve it, or change it by voice ("I'm not driving tomorrow, 50 percent is fine"), and the plan re-optimizes.
+Malik's phone buzzes: *"Your mom is checking it's really you. Someone called her claiming to be you."* He taps **It wasn't me. I'm fine.**
 
-At 6:15 the phone rings.
+> **Alexa (Hirz):** Malik's fine. That call wasn't him.
 
-> **You:** Alexa, send five hundred dollars to this number. It's for Dad, he's stranded.
+Hirz never used anything the caller said as a fact. It checked the household's own records and asked Malik through a channel the family verified in advance.
+
+5:31 PM, at Malik's. He is just home, and rattled.
+
+> **Malik:** Alexa, from now on, never unlock the door for someone we're not expecting.
 >
-> **Alexa (Haven):** I can't send money; your household rules never allow it. And this request has the pattern of a family impersonation scam: urgency, money, and a number that isn't one of Dad's verified contacts. I can check with Dad through his own Haven app, or call his verified number. Want me to?
+> **Alexa (Hirz):** I've written that as a rule and sent it to your phone. It won't take effect until you approve it there.
 
-Dad taps "I'm fine" on his phone. Haven refused the request under a rule the household wrote, and never used anything the caller said as a fact. The same flow protects a parent living alone whose Echo is linked to their own Haven.
+On his phone: one English sentence, a before-and-after line (*Unexpected visitor: ask on phone → never*), the compiled policy underneath. He activates it with his passkey. Anyone in the room can propose a rule. Only a person on their own phone can activate one.
 
-Next morning:
+> **Malik:** What's going on tonight?
+>
+> **Alexa (Hirz):** You're in the peak window until 7. I'll run the house off the battery, warm the living room for your mom, and hold the car until after 9.
 
-> **Alexa (Haven):** Good morning. Overnight I charged the car to 52 percent in the 1 AM window, ran the dishwasher after your dad finished in the kitchen, and kept the house within your comfort band. The scorecard has yesterday's peak kilowatt-hours avoided and the cost saved. One request was flagged and verified, and one action asked for your OK under your own rule.
+The screen shows the plan as a card: what it saves tonight, three rows, one Approve button. He changes it by voice ("don't charge the car past 50, I'm not driving tomorrow") and the plan re-optimizes.
 
-Every one of those sentences is backed by a structured record: what Haven did, why, under which rule of the household constitution, at what risk band, and who approved it. Every number Haven speaks comes from a cited scenario run against real price and weather data; on a flat real-time tariff like ComEd's the nightly dollar saving is modest and Haven says so, which is why the scorecard leads with peak kilowatt-hours avoided.
+At 6:40 the doorbell rings and nobody is expected. "Let them in."
 
-## What Haven adds
+> **Alexa (Hirz):** You added a rule tonight: I never unlock for someone who isn't expected.
 
-Approval gates, an audit ledger, and a simulated Alexa+ host are the baseline for a household agent, and Haven has all three. The four things below are what Haven adds on top of that baseline.
+At 7:04 it rings again. A vehicle pulled in at 6:58, and Mom is expected at 7:00. "That's my mom, let her in."
+
+> **Alexa (Hirz):** Unlocking the door needs your approval on your phone. I've sent it.
+
+Same lock, two outcomes. *Never*, because the family said so an hour ago. *Ask*, on a phone, never by voice, because an Echo is a shared device and Alexa does not tell add-ons who is speaking.
+
+Every one of those sentences is backed by a structured record: what Hirz did, why, under which rule of the household constitution, at what risk band, and who approved it. Every number Hirz speaks comes from a cited scenario run. The demo household is on ComEd's published Time-of-Day rate, where the all-in peak price is several times the overnight price; the same evening is also run on ComEd's live hourly feed, and the backtest table below shows both. Nothing here is typed by hand.
+
+| Rate plan (both real ComEd residential rates) | Saving per night | Annualized | Worst spike night avoided | Hours charged at negative prices |
+|---|---|---|---|---|
+| Time-of-Day (published rate table) | *from the backtest, `ROADMAP.md` item 17* | | n/a | n/a |
+| Hourly Pricing (live feed, a year of history) | | | | |
+
+## Why existing agents fall short
+
+Alexa+ can now call third-party tools over MCP, orchestrate multi-turn conversations, and render interactive UI. Household agents built on it already follow a common pattern: an allowlist of actions, a human-approval step for the risky ones, and an audit trail. That pattern is necessary and Hirz has it. It is not sufficient, for three reasons:
+
+1. **The boundary is the developer's, not the household's.** An allowlist is written in code by whoever built the agent. A family needs to *write* the answer to "how much authority do you have?" themselves, change it, and see proof that it was enforced somewhere the agent's own code cannot get around.
+2. **Trust comes from the caller.** The same channel that takes "turn off the lights" also takes "it's me, I'm in trouble, send money". An assistant with no record of who Malik is and how to reach him can only take the caller's word for it.
+3. **One user, one command at a time.** Preferences, routines, people, assets, and constraints live in ten apps and nobody's head. Nothing plans across Mom's comfort, the car's deadline, tonight's prices, and Dad's "kitchen is busy until 11" in one decision, with numbers it can defend.
+
+## What Hirz adds
+
+Approval gates, an audit ledger, and a simulated Alexa+ host are the baseline for a household agent, and Hirz has all three. The four things below are what Hirz adds on top of that baseline.
 
 | | What it is | Why it matters |
 |---|---|---|
-| **Household Constitution, compiled to Cedar, enforced twice** | A document the household writes, as a form, as YAML, or in plain English, stating per action class and per member what Haven may do on its own, what it must ask about, and what it may never do. Every version compiles to a Cedar/Dogwood policy set that AgentCore Policy enforces at the AWS tool boundary, outside Haven's process, including a temporal "approval must precede action" rule. | The boundary belongs to the family, not the developer, and the proof that it held comes from an engine the agent cannot reach. |
-| **A real planner over real prices** | A rolling-horizon MILP schedules the EV, the home battery, HVAC, and appliances against live utility prices and weather, per-occupant comfort bands, and member constraints, and reports savings against a baseline plan solved with the same model. A physics twin supplies every device that is not real, labeled as such. | The savings on the scorecard are computed, not typed, and the binding constraints and rejected alternatives are outputs of the model rather than a story about it. |
+| **A boundary the household writes, that the home itself enforces** | A Household Constitution, proposed by voice or written as a form, as YAML, or in plain English, and always activated by a person on their own phone. It states per action class and per member what Hirz may do on its own, what it must ask about, and what it may never do. Every version compiles to a Cedar/Dogwood policy set that AgentCore Policy enforces at the AWS tool boundary, including a temporal "approval must precede action" rule. Only a permit gets a command signed, and the home-side agent, Hirz Link, obeys only signed commands. | The boundary belongs to the family, not the developer. Hirz's own processes hold no credential that can act on a device; only commands the policy engine authorized are signed, and the home obeys only signed commands. |
+| **Verification from the household's own records** | Trusted contacts have channels verified out of band at setup. A request is checked against those records and confirmed through the subject's own app or verified number, never through anything the caller supplied. A recent scam call plus an unexpected visitor at the door raises a warning. Hirz has no way to move money, by design. | "Is this really Malik?" is answered by the graph, not by the person asking. |
+| **A real planner over real prices** | A rolling-horizon MILP schedules the EV, the home battery, HVAC, and appliances against the household's real rate plan (all-in, supply plus delivery) and live weather, per-occupant comfort bands, and member constraints, and reports savings against a baseline plan solved with the same model. A physics twin supplies every device that is not real, labeled as simulated. | The savings on the scorecard are computed, not typed, and the binding constraints and rejected alternatives are outputs of the model rather than a story about it. |
 | **Multi-member coordination with provenance** | Each member's constraints and preferences keep their owner and time: "Dad, 22:40: kitchen in use until 23:00" survives into the plan, the explanation, and the audit row. Conflicts between members are returned as data with the people involved, never silently resolved. | A household is not one user. The plan can say whose request moved the dishwasher, and why. |
-| **Verification from the household's own records** | Trusted contacts have channels verified out of band at setup. A request is checked against those records and confirmed through the subject's own app or verified number, never through anything the caller supplied. Money never moves; the classes exist so the constitution can forbid them provably. | "Is this really Dad?" is answered by the graph, not by the person asking. |
 
 Underneath all four: a deterministic risk engine whose bands set floors the constitution can tighten but never loosen, and a pipeline in which every action carries what, why, which rule, and what was rejected, as data that Alexa narrates. Those are the mechanisms that make the four hold; they are not the claim.
 
+In local mode there is no outside boundary: the second policy evaluator runs in the same container and is labeled as exactly that. "Enforced outside Hirz" is claimed for the AWS deployment only.
+
 ## Architecture
 
-Every box is a module described in [`ARCHITECTURE.md`](./ARCHITECTURE.md). Surfaces talk to Haven Core only through MCP tools or the companion API; Core talks to the world only through adapters, each of which has a real implementation and a **digital-twin** implementation behind the same interface.
+![Hirz loop](./docs/img/loop.svg)
+
+*Observe → Understand → Plan → Evaluate Risk → Check Authority → Act → Verify → Remember. Every action Hirz takes passes through that loop, and every step of it is recorded.*
+
+Every box is a module described in [`ARCHITECTURE.md`](./ARCHITECTURE.md). Surfaces talk to Hirz Core only through MCP tools or the companion API; Core talks to the world only through adapters, each of which has a real implementation and a **digital-twin** implementation behind the same interface.
 
 ```mermaid
 graph TD
     subgraph Surfaces
         Alexa["Alexa+ (MCP add-on, Streamable HTTP, MCP App UI)"]
-        Sim["Haven Simulator (web: emulated Alexa+ host, voice + screen)"]
+        Sim["Hirz Simulator (web: emulated Alexa+ host, voice + screen)"]
         App["Companion web app (constitution, approvals, audit, twin)"]
     end
 
@@ -75,7 +106,7 @@ graph TD
     Sim --> MCP
     App --> API["Companion API"]
 
-    subgraph Core["Haven Core (Python)"]
+    subgraph Core["Hirz Core (Python)"]
         MCP --> Ctx["Context Service (Household Graph read model)"]
         MCP --> Pipe["Decision Pipeline"]
         API --> Pipe
@@ -91,9 +122,9 @@ graph TD
     end
 
     subgraph Adapters["Adapters (real | twin)"]
-        Dev["Devices: Home Assistant"]
+        Dev["Devices: Home Assistant, reached through Hirz Link (home agent: holds the token, obeys only signed commands)"]
         EV["EV: Smartcar sandbox / Tesla / twin"]
-        Energy["Energy: ComEd prices, Open-Meteo, battery + solar twin"]
+        Energy["Energy: ComEd Time-of-Day rate table + Hourly feed, Open-Meteo, battery + solar twin"]
         Wear["Wearable: Oura / Whoop / Bee / twin"]
         Cal["Calendar: Google / ICS / twin"]
         Door["Doorbell: Ring sandbox / twin"]
@@ -105,8 +136,10 @@ graph TD
 
     subgraph AWS["AWS (AgentCore + Bedrock)"]
         RT["AgentCore Runtime (hosts the MCP server role)"]
-        WK["Worker service (App Runner: scheduler, executor, pollers, companion API, webhooks)"]
+        WK["Worker service (App Runner: scheduler, executor, pollers, Link relay, companion API, webhooks; holds no device credential)"]
         GW["AgentCore Gateway + Policy (Cedar compiled from the constitution, temporal approval rules)"]
+        KMS["KMS key: only the Gateway's Lambda may sign a home command"]
+        S3A["S3 Object Lock: audit chain anchors"]
         Mem["AgentCore Memory"]
         Id["AgentCore Identity (outbound credential vault)"]
         BR["Bedrock: Claude Haiku 4.5 / Sonnet 5; emulator on Haiku 4.5 by default, Nova Lite selectable"]
@@ -116,6 +149,8 @@ graph TD
     Exec -.-> WK
     API -.-> WK
     Exec -.-> GW
+    GW -.-> KMS
+    Audit -.-> S3A
     Memory -.-> Mem
     Adapters -.-> Id
     Explain -.-> BR
@@ -132,7 +167,7 @@ graph TD
 5. Risk band escalation            → HIGH forces ASK even where the constitution says auto
 6. Budgets and rate limits         → daily $ limit, action counts → ASK or DENY
 7. Boundary enforcement (Cedar)    → AgentCore Policy must agree; disagreement fails closed
-8. → EXECUTE | ASK | DENY | VERIFY
+8. → EXECUTE | ASK | DENY | VERIFY    (EXECUTE on a home device = a command the boundary signed, verified in the home)
 ```
 
 ## Tech stack
@@ -144,16 +179,18 @@ graph TD
 | Policy | YAML constitution + Pydantic schema + a non-Turing-complete condition grammar, compiled to Cedar | Git-diffable, validated at load, analyzable; enforced in-process and at the AWS tool boundary ([ADR-003](./docs/adr/ADR-003-constitution-yaml-to-cedar.md)) |
 | Risk | Fixed action-class table + dynamic factors, **no ML** | A household decision the family can't explain is one they can't trust ([ADR-004](./docs/adr/ADR-004-no-ml-risk-scoring.md)) |
 | Storage | PostgreSQL 16 (household graph, constitution versions, plans, approvals, audit chain) + AgentCore Memory (conversational, preference extraction) | Relational integrity for a hash chain; graph as tables + JSONB ([ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md)) |
-| Surfaces | React + TypeScript: MCP App (`@modelcontextprotocol/ext-apps`), companion app, simulator | The MCP Apps SDK and the Alexa tooling are TypeScript ([ADR-001](./docs/adr/ADR-001-python-core-typescript-surfaces.md)) |
+| Surfaces | React + TypeScript: MCP App cards (`@modelcontextprotocol/ext-apps`, plain CSS carrying Amazon's design tokens), companion app and simulator (Tailwind + shadcn/ui) | The MCP Apps SDK and the Alexa tooling are TypeScript ([ADR-001](./docs/adr/ADR-001-python-core-typescript-surfaces.md)); the cards follow Amazon's add-on design guide verbatim ([`docs/design.md`](./docs/design.md)) |
+| Home agent | Hirz Link: a small Python process beside Home Assistant, outbound-only, executes only KMS-signed commands | The Home Assistant token never leaves the house, no tunnel, and a bypass in Hirz's own processes has nothing to act with ([ADR-009](./docs/adr/ADR-009-signed-commands-home-agent.md)) |
+| Open source | A separate repository: an add-on conformance checker (CLI, black-box against any MCP server) and the simulator's generic host harness | Every entrant builds an emulated host and none is faithful; Hirz's simulator is built on the published harness and its CI runs the checker |
 | Alexa+ | MCP 2025-11-25, Streamable HTTP, OAuth 2.1 + PKCE S256, Protected Resource Metadata, MCP Apps for visuals | The add-on contract, verbatim ([ADR-007](./docs/adr/ADR-007-alexa-surface-strategy.md)) |
-| AWS | AgentCore Runtime, Gateway, Policy, Memory, Identity; Bedrock (Claude Haiku 4.5 / Sonnet 5; the emulator runs Haiku 4.5 by default with Nova Lite selectable); EventBridge Scheduler + Lambda; CDK (TypeScript) | AWS runs Haven's agentic state and enforcement, not just its hosting ([ADR-008](./docs/adr/ADR-008-agentcore-topology.md)) |
+| AWS | AgentCore Runtime, Gateway, Policy, Memory, Identity; Bedrock (Claude Haiku 4.5 / Sonnet 5; the emulator runs Haiku 4.5 by default with Nova Lite selectable); EventBridge Scheduler + Lambda; KMS (command signing); S3 Object Lock (audit anchors); CDK (TypeScript) | AWS runs Hirz's agentic state and enforcement, not just its hosting ([ADR-008](./docs/adr/ADR-008-agentcore-topology.md)) |
 | Twin | Physics-lite models with a simulated clock and a YAML scenario DSL | Everything is demonstrable end to end with no hardware, and every scenario is an integration test ([ADR-006](./docs/adr/ADR-006-twin-first-adapters.md)) |
-| Ops | Docker Compose (Postgres, Home Assistant demo, Haven), OpenTelemetry → CloudWatch via AgentCore Observability, GitHub Actions (ruff / mypy strict / pytest 80% gate / tsc / vitest / playwright) | |
+| Ops | Docker Compose (Postgres, Home Assistant demo, Hirz), OpenTelemetry → CloudWatch via AgentCore Observability, GitHub Actions (ruff / mypy strict / pytest 80% gate / tsc / vitest / playwright) | |
 
 ## Repository layout
 
 ```
-Haven/
+Hirz/
 ├── README.md, ARCHITECTURE.md, THREAT_MODEL.md, ROADMAP.md, SECURITY.md, CHANGELOG.md
 ├── CLAUDE.md, AGENTS.md            # instruction files for coding agents (kept at parity)
 ├── docs/
@@ -161,9 +198,10 @@ Haven/
 │   ├── constitution.md             # the Household Constitution spec
 │   ├── tool-catalog.md             # every MCP tool: name, schema, output, voice fallback
 │   ├── twin-and-scenarios.md       # digital twin models and the scenario DSL
+│   ├── design.md                   # Amazon's design tokens, per-card specs, the seven hand-designed screens
 │   ├── demo-script.md              # the 3-minute video, beat by beat
 │   └── submission.md               # hackathon requirements checklist
-├── haven/                          # Python core package
+├── hirz/                          # Python core package
 │   ├── graph/                      # household graph models, repository, versioning
 │   ├── constitution/               # schema, loader, condition grammar, Cedar compiler, evaluator
 │   ├── risk/                       # action classes, factors, bands
@@ -175,16 +213,18 @@ Haven/
 │   ├── audit/                      # hash chain, signing, export, verifier
 │   ├── adapters/                   # one package per domain; each has real/ and twin/
 │   ├── twin/                       # physics models, sim clock, scenario engine
+│   ├── link/                       # Hirz Link: the home agent that obeys only signed commands
 │   ├── mcp/                        # MCP server, tools, OAuth PRM, MCP App resources
 │   ├── api/                        # companion API (FastAPI)
-│   └── cli.py                      # haven CLI: decide, plan, scenario, verify-audit, doctor
+│   └── cli.py                      # hirz CLI: decide, plan, scenario, verify-audit, doctor
 ├── apps/
 │   ├── mcp-app/                    # React MCP App bundle (plan card, approval card, verification card, scorecard)
 │   └── web/                        # one React app: companion pages + the Alexa+ simulator route (emulator agent, voice, device modes)
 ├── infra/cdk/                      # AWS CDK (TypeScript): AgentCore, Cognito, Bedrock access, scheduler, RDS
-├── scenarios/                      # YAML scenarios (the demo evening, test fixtures)
-├── constitutions/                  # example constitutions incl. the demo household
-├── compose.dev.yml, compose.demo.yml
+├── scenarios/                      # YAML scenarios (the parents' scam check, the demo evening, test fixtures)
+├── constitutions/                  # quinn-home (Malik's), quinn-parents (Mom and Dad's), examples
+├── tariffs/                        # published rate tables with source URLs (ComEd Time-of-Day)
+├── compose.dev.yml, compose.demo.yml, compose.link.yml
 ├── alembic/                        # Postgres migrations
 ├── scripts/
 └── tests/{unit,integration,adversarial,scenarios,ux,latency}
@@ -193,23 +233,24 @@ Haven/
 ## Quickstart (target state, see `ROADMAP.md` Phase 0)
 
 ```bash
-git clone https://github.com/BashaarJavaid/HavenOS && cd HavenOS
+git clone https://github.com/BashaarJavaid/Hirz && cd Hirz
 cp .env.example .env
-docker compose -f compose.dev.yml up -d          # Postgres 16 + Home Assistant (demo devices) + Haven
+docker compose -f compose.dev.yml up -d          # Postgres 16 + Home Assistant (demo devices) + Hirz
 uv sync && uv run alembic upgrade head
-uv run haven scenario run scenarios/demo-evening.yaml --speed 60   # the whole evening in 3 minutes
+uv run hirz scenario run scenarios/demo-evening.yaml --speed 60   # the whole evening in 3 minutes
 open http://localhost:3000                       # companion app + simulator
 ```
 
-No AWS account is required for the local path. `HAVEN_LLM=off` runs every flow deterministically with canned explanations, which is what CI uses and what a judge with no credentials can run.
+During the judging window there is also a hosted demo: one click seeds a throwaway household on simulated devices only, so nothing needs installing (the link is in the Devpost testing instructions). No AWS account is required for the local path. `HIRZ_LLM=off` runs every flow deterministically with canned explanations, which is what CI uses and what a judge with no credentials can run.
 
 ## Documentation
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — layers, the decision pipeline, canonical objects, every component in depth, data model, latency budget, failure modes, hardening, observability, testing, CI/CD, deployment
-- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — what Haven protects against, what it doesn't, and the assumptions underneath
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — what Hirz protects against, what it doesn't, and the assumptions underneath
 - [`docs/constitution.md`](./docs/constitution.md) — the Household Constitution: schema, modes, conditions, compilation to Cedar, examples
 - [`docs/tool-catalog.md`](./docs/tool-catalog.md) — the MCP tool surface Alexa+ sees
 - [`docs/twin-and-scenarios.md`](./docs/twin-and-scenarios.md) — the digital twin and scenario DSL
+- [`docs/design.md`](./docs/design.md) — the visual design spec: Amazon's tokens, display modes, per-card specs
 - [`docs/demo-script.md`](./docs/demo-script.md) — the video storyboard
 - [`docs/submission.md`](./docs/submission.md) — hackathon checklist and the product-feedback / friction-log plan
 - [`docs/adr/`](./docs/adr/) — decisions and rejected alternatives
@@ -218,7 +259,7 @@ No AWS account is required for the local path. `HAVEN_LLM=off` runs every flow d
 
 ## How this is built
 
-Haven is built by one engineer working with AI coding assistants. The design decisions are the human's: the thesis, the four things Haven adds, the decision pipeline and its precedence, the fail-closed posture, the choice to keep the risk engine free of ML and the constitution non-Turing-complete, the twin-first adapter strategy, and every rejected alternative in `docs/adr/`. The assistants implement downstream of those decisions under the standing rules in [`CLAUDE.md`](./CLAUDE.md): surface assumptions, ask before deciding, no speculative complexity, verify every feature by running it.
+Hirz is built by one engineer working with AI coding assistants. The design decisions are the human's: the thesis, the four things Hirz adds, the decision pipeline and its precedence, the fail-closed posture, the choice to keep the risk engine free of ML and the constitution non-Turing-complete, the twin-first adapter strategy, and every rejected alternative in `docs/adr/`. The assistants implement downstream of those decisions under the standing rules in [`CLAUDE.md`](./CLAUDE.md): surface assumptions, ask before deciding, no speculative complexity, verify every feature by running it.
 
 Nothing in this README is asserted on a model's say-so. Where something is simulated it is labeled as a twin in the UI and in the docs. Where something is unproven or unprotected, `THREAT_MODEL.md` says so.
 

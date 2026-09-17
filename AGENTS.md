@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Project-specific context and instructions for Haven (this file mirrors `CLAUDE.md` for Codex and other coding agents), merged with a set of general behavioral guidelines (sections 1–5 below, adapted from [andrej-karpathy-skills/CLAUDE.md](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md) and from the author's PortunusMCP conventions) aimed at reducing common LLM coding mistakes: unstated assumptions, speculative complexity, unrelated edits, vague success criteria, and unverified claims of completion.
+Project-specific context and instructions for Hirz (this file mirrors `CLAUDE.md` for Codex and other coding agents), merged with a set of general behavioral guidelines (sections 1–5 below, adapted from [andrej-karpathy-skills/CLAUDE.md](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md) and from the author's PortunusMCP conventions) aimed at reducing common LLM coding mistakes: unstated assumptions, speculative complexity, unrelated edits, vague success criteria, and unverified claims of completion.
 
 **Tradeoff:** these guidelines bias toward caution over speed. For trivial tasks, use judgment. When in doubt, ask.
 
@@ -8,16 +8,17 @@ Project-specific context and instructions for Haven (this file mirrors `CLAUDE.m
 
 ## Project
 
-Haven — the bounded-autonomy operating system for the home: a permissioned household agent for Alexa+ (MCP add-on), with a household graph, a user-authored constitution enforced twice (in-process and via AgentCore Policy), a deterministic risk engine, a MILP planner, a protect layer, a digital twin, and a companion web app plus an Alexa+ simulator. Full pitch in `README.md`. Built for the Build, Ship, Shape: Amazon Developer Hackathon 2026 (submission deadline **2026-10-23 12:00 PT**), Alexa+ track primary, Ring track secondary, AWS Builder mini-challenge, and designed as a startup beyond it.
+Hirz — house rules for the AI in your home, and your parents': a permissioned household agent for Alexa+ (MCP add-on) that lets a family decide what Alexa may do on its own, what it must ask about, and what it may never do ("bounded autonomy" in the architecture docs). The customer is the family's household manager, responsible for their own home and their parents'; Hirz is rules, not care. It has a household graph, a household-authored constitution (proposed by voice, activated on a phone) enforced in-process, via AgentCore Policy, and by a home agent that obeys only signed commands (Hirz Link), a deterministic risk engine, a MILP planner over real ComEd rate plans, a protect layer, a digital twin, and a companion web app plus an Alexa+ simulator. Full pitch in `README.md`. Built for the Build, Ship, Shape: Amazon Developer Hackathon 2026 (submission deadline **2026-10-23 12:00 PT**): Alexa+ track, Ring track if the item 34 gate passes, both mini-challenges (AWS Builder; Open Source through a separate repository holding an add-on conformance checker and the simulator's host harness), and designed as a startup beyond it. The project was renamed from its first name on 2026-09-17 (`CHANGELOG.md`).
 
 ## Where things live
 
 - `README.md` — what this is, the demo story, tech stack, repo layout, quickstart. Read this first.
-- `ARCHITECTURE.md` — layers, the Haven loop and the decision pipeline (§3), canonical objects (§4), every component (§5), data model, identity, latency budget, failure modes, hardening, observability, testing, CI, deployment. Load the section relevant to the component being touched, not the whole file.
+- `ARCHITECTURE.md` — layers, the Hirz loop and the decision pipeline (§3), canonical objects (§4), every component (§5), data model, identity, latency budget, failure modes, hardening, observability, testing, CI, deployment. Load the section relevant to the component being touched, not the whole file.
 - `THREAT_MODEL.md` — what's protected, what isn't, assumptions. Load for anything touching the pipeline, constitution, risk, protect, auth, audit, or adapters that act on the world.
 - `docs/constitution.md` — the constitution spec, grammar, Cedar compilation. Load for constitution or policy work.
 - `docs/tool-catalog.md` — the MCP tool surface and its contract. Load for MCP server or tool work.
-- `docs/twin-and-scenarios.md` — twin models and the scenario DSL. Load for adapter, twin, or scenario work.
+- `docs/twin-and-scenarios.md` — twin models, rate-plan profiles, and the scenario DSL (two demo scenarios). Load for adapter, twin, or scenario work.
+- `docs/design.md` — Amazon's design tokens and display modes, per-card specs, the seven hand-designed screens, spoken-line limits. Load for any card, companion-app, simulator, or `speakable` work.
 - `docs/demo-script.md`, `docs/submission.md` — the video and the hackathon checklist. Load for Phase 8 work.
 - `docs/friction-log.md` — every friction point hit with a third-party tool, in Devpost's format, plus feature requests. Append to it as friction happens (see Conventions).
 - `docs/adr/` — one file per decision with rejected alternatives. Load the specific ADR for the component being touched.
@@ -29,19 +30,22 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 
 ## Conventions
 
-- **Python 3.12, `uv`, FastAPI, official `mcp` SDK, async throughout** for `haven/`. **TypeScript strict, React, pnpm workspaces** for `apps/`. **CDK in TypeScript** for `infra/`. Ruff and mypy strict for Python; eslint and `tsc --noEmit` for TypeScript. Don't introduce another language or a second web framework.
+- **Python 3.12, `uv`, FastAPI, official `mcp` SDK, async throughout** for `hirz/`. **TypeScript strict, React, pnpm workspaces** for `apps/`: Tailwind + shadcn/ui for `apps/web`; plain CSS custom properties carrying Amazon's design tokens, and no component library, for the MCP App cards. **CDK in TypeScript** for `infra/`. Ruff and mypy strict for Python; eslint and `tsc --noEmit` for TypeScript. Don't introduce another language or a second web framework.
 - **No LLM in any decision.** The pipeline, risk engine, constitution evaluator, planner, executor, and protect weighting are code. Models narrate (Explainer), draft (constitution English → YAML patch), and extract structured signals (Protect) behind schema validation. If a change routes a decision through a model, it is wrong. See `ARCHITECTURE.md` §5.3, §5.4, §5.7, §5.8.
 - **No ML risk scoring.** The risk table and factors are the deliberate design (ADR-004), not a gap to fill.
 - **The constitution grammar is non-Turing-complete.** No loops, functions, recursion, arithmetic beyond literal comparison. Don't "helpfully" extend it.
-- **One canonical shape per object.** `Action`, `Decision`, `Plan`, `AuditEvent`, `VerificationCase` are defined once in `ARCHITECTURE.md` §4 and `haven/pipeline/models.py`. Don't invent a new response shape for a new endpoint or tool.
+- **One canonical shape per object.** `Action`, `Decision`, `Plan`, `AuditEvent`, `VerificationCase` are defined once in `ARCHITECTURE.md` §4 and `hirz/pipeline/models.py`. Don't invent a new response shape for a new endpoint or tool.
 - **Every state change goes through the pipeline** and produces an audit row. There is no admin path, script, or test helper that executes an action without a `Decision`.
 - **Fail closed** for anything whose failure would weaken a guarantee (Postgres, audit write, boundary evaluation, risk exception). If unsure whether something fails open or closed, it's closed. `ARCHITECTURE.md` §9.
-- **Twin is labeled.** Every observation carries `source: real | twin`; UI and tool outputs show it. Never present twin data as real.
-- **Roles bind to linked accounts, never to voices.** Alexa gives add-ons no speaker identity, so an Echo is a shared device. `security.*` classes are never approvable by voice (approval is in the companion app under a passkey; the validator rejects `alexa` in their `ask_channels`), claimed identity and any speaker hint only lower authority, and Haven never does its own speaker or face recognition. See `ARCHITECTURE.md` §7 and `docs/constitution.md` §2.5.
-- **Every tool output has `speakable`** with ≤ 5 options and no internal IDs or JSON in consumer strings; every tool stays under the latency budget (`ARCHITECTURE.md` §8) by never calling a model, a solver, or a third-party network inside the call.
-- **Real API contracts, verbatim.** Alexa+ (MCP 2025-11-25, Streamable HTTP, OAuth 2.1 PKCE S256, PRM), AgentCore (Runtime `/mcp` on 8000, CUSTOM_JWT, Gateway policy session header, Cedar/Dogwood quotas), Ring (HMAC-SHA256 webhooks), ComEd, Open-Meteo. When a doc is unclear, fetch it and cite it in the ADR or the code comment; don't guess an API shape.
+- **Twin is labeled.** Every observation carries `source: real | real API, demo devices | twin`; tool outputs and detail views show it. Cards show two states, `live` and `simulated` (anything not plainly `real` shows as simulated). A published rate table is `real (published ComEd rate)`, never "live". Never present twin data as real. Hosted-demo households bind `twin` adapters only.
+- **No Hirz process outside the home holds a device credential in AWS mode.** The Home Assistant token stays with Hirz Link in the house; the home obeys only commands signed by the KMS key that only the `hirz-actions` Lambda role may use; write-capable cloud credentials are readable by that role only. A change that hands the worker or the `mcp` role something it can act with is wrong (ADR-009). Local mode has no outside boundary and is labeled `dogwood-local`.
+- **A voice proposes, a phone activates.** Rule changes spoken to Alexa are proposals (`propose_household_rule`); activation is passkey-gated in the companion app. Same principle as security approvals.
+- **Numbers are derived, never typed.** Every dollar and kWh figure in the product, the README, the video, and the Devpost text comes from a cited scenario run or the backtest in `scripts/`; rate tables carry their source URL and effective date.
+- **Roles bind to linked accounts, never to voices.** Alexa gives add-ons no speaker identity, so an Echo is a shared device. `security.*` classes are never approvable by voice (approval is in the companion app under a passkey; the validator rejects `alexa` in their `ask_channels`), claimed identity and any speaker hint only lower authority, and Hirz never does its own speaker or face recognition. See `ARCHITECTURE.md` §7 and `docs/constitution.md` §2.5.
+- **Every tool input is flat** (enums and scalars in consumer language; no free-form objects, no internal class names). **Every tool output has `speakable`** with a headline of about 20 words or fewer, ≤ 5 options, and no internal IDs or JSON in consumer strings; every tool stays under the latency budget (`ARCHITECTURE.md` §8) by never calling a model, a solver, or a third-party network inside the call.
+- **Real API contracts, verbatim.** Alexa+ (MCP 2025-11-25, Streamable HTTP, OAuth 2.1 PKCE S256, PRM; the add-on design guide's tokens and display modes, `docs/design.md`), AgentCore (Runtime `/mcp` on 8000, CUSTOM_JWT, Gateway policy session header, Cedar/Dogwood quotas), Ring (HMAC-SHA256 webhooks), ComEd, Open-Meteo. When a doc is unclear, fetch it and cite it in the ADR or the code comment; don't guess an API shape.
 - **Secrets** only in `.env` (local) or AgentCore Identity (AWS). Never in the graph, the constitution, audit payloads, tests, or docs.
-- **AWS spend is bounded.** Pay-per-use services plus exactly two always-on ones, RDS and the worker service (ADR-008, approved 2026-09-16), all deployed for the judging window and destroyed after. Don't add another always-on AWS resource without asking.
+- **AWS spend is bounded.** Pay-per-use services plus exactly two always-on ones, RDS and the worker service (ADR-008, approved 2026-09-16), all deployed for the judging window and destroyed after. Approved pay-per-use additions (2026-09-17): one KMS signing key, one S3 Object Lock anchor bucket, the community Skill bridge's stack for the recording only, and Bedrock usage by the rate-limited hosted demo. Don't add another always-on AWS resource without asking.
 - **`THREAT_MODEL.md` rows move only when earned.** A row becomes "Yes" when the item that earns it is built and its `verify:` check passes. Claims never outrun code.
 - Relative dates in docs are absolute (`2026-10-23`), never "next week".
 - **Friction log, from day one.** Devpost gives up to a 10 percent bonus for it, so it is the cheapest score in the project. Anyone, human or agent, appends an entry to `docs/friction-log.md` at the moment a third-party tool, API, SDK, doc, or CLI did not do what its docs said, cost more than about 15 minutes, or forced a workaround. Log it then, not at the end of the session, because sessions end without warning. At the end of any task that touched a third-party tool, check whether an entry was earned and add it if missed. Entries are facts from the session with the doc URL and the exact error text; never invented, never padded. Severity: `Blocker`, `Major`, `Minor`.
@@ -51,22 +55,25 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 Target state; each phase adds its commands here as they become real.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
-- `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Haven.
+- `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Hirz.
 - `uv run alembic upgrade head` — migrations.
-- `uv run haven doctor` — local diagnostics (Postgres, HA, signing key, migrations, constitution compiles); `--aws` adds PRM, `401`, Runtime tool call, Gateway policy decision, scheduler tick.
-- `uv run haven decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
-- `uv run haven scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
-- `uv run haven verify-audit` / `uv run haven audit export --range ...` — audit chain.
-- `uv run haven constitution validate|compile|analyze|activate constitutions/quinn-home.yaml` (`analyze` runs AgentCore Policy's automated reasoning and needs AWS credentials; locally it reports "not analyzed").
+- `uv run hirz doctor` — local diagnostics (Postgres, HA, signing key, migrations, constitution compiles); `--aws` adds PRM, `401`, Runtime tool call, Gateway policy decision, scheduler tick.
+- `uv run hirz decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
+- `uv run hirz scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
+- `uv run hirz verify-audit` (`--anchors` also checks the S3 anchors in AWS mode) / `uv run hirz audit export --range ...` — audit chain.
+- `docker compose -f compose.link.yml up -d` — Hirz Link beside Home Assistant, in the home (AWS mode).
+- `uv run python scripts/backtest.py` — the year-long rate-plan backtest every published savings figure comes from.
+- `uv run hirz constitution validate|compile|analyze|activate constitutions/quinn-home.yaml` (`analyze` runs AgentCore Policy's automated reasoning and needs AWS credentials; locally it reports "not analyzed").
 - `uv run pytest` — tests; `uv run pytest tests/latency` — budget; `uv run pytest tests/cedar_conformance` — both engines.
-- `uv run ruff check . && uv run ruff format --check . && uv run mypy haven/`.
+- `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/`.
+- The add-on conformance checker (separate open-source repository, name to be chosen) run against the local MCP server.
 - `pnpm -r lint && pnpm -r typecheck && pnpm -r test`; `pnpm --filter web dev` (companion pages + simulator route), `pnpm --filter mcp-app build`.
 - `cd infra/cdk && pnpm cdk deploy` / `pnpm cdk destroy` — the AWS stack for the judging window.
-- `HAVEN_LLM=off|bedrock`, `HAVEN_ADAPTERS=devices:ha,ev:twin,energy:real,...` — runtime configuration.
+- `HIRZ_LLM=off|bedrock`, `HIRZ_ADAPTERS=devices:ha,ev:twin,energy:real,...` — runtime configuration.
 
 ## Current phase
 
-**Phase 0 is next: nothing is built yet.** The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15). Start with `ROADMAP.md` items 1–5. Do not pull forward Phase 1 work while scaffolding.
+**Phase 0 is next: nothing is built yet.** The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. Start with `ROADMAP.md` items 1–5. Do not pull forward Phase 1 work while scaffolding.
 
 ---
 

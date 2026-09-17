@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-09-15)
 
-**Decision:** Haven Core (graph, constitution, risk, pipeline, planner, executor, protect, adapters, twin, MCP server, companion API) is Python 3.12 on FastAPI and the official `mcp` SDK. The MCP App cards, the companion web app, the simulator, and the AWS CDK stack are TypeScript.
+**Decision:** Hirz Core (graph, constitution, risk, pipeline, planner, executor, protect, adapters, twin, MCP server, companion API) is Python 3.12 on FastAPI and the official `mcp` SDK. The MCP App cards, the companion web app, the simulator, and the AWS CDK stack are TypeScript.
 
 **Reasoning:**
 

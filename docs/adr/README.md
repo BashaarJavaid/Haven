@@ -8,5 +8,6 @@ One file per consequential decision, each with the alternatives that were reject
 - [`ADR-004-no-ml-risk-scoring.md`](./ADR-004-no-ml-risk-scoring.md) — Table-driven risk bands, no formula, no model
 - [`ADR-005-deterministic-planner.md`](./ADR-005-deterministic-planner.md) — MILP on HiGHS; the LLM only narrates
 - [`ADR-006-twin-first-adapters.md`](./ADR-006-twin-first-adapters.md) — Every adapter ships real and twin behind one interface; the twin is product, not test scaffolding
-- [`ADR-007-alexa-surface-strategy.md`](./ADR-007-alexa-surface-strategy.md) — Build to the real add-on contract; demo through an emulated host; Skill bridge later
+- [`ADR-007-alexa-surface-strategy.md`](./ADR-007-alexa-surface-strategy.md) — Build to the real add-on contract; demo through an emulated host; one read-only clip through the community Skill bridge
 - [`ADR-008-agentcore-topology.md`](./ADR-008-agentcore-topology.md) — Runtime hosts the MCP server; Gateway + Policy is the second enforcement point; cost posture
+- [`ADR-009-signed-commands-home-agent.md`](./ADR-009-signed-commands-home-agent.md) — The home obeys only commands the boundary signed; Hirz Link holds the Home Assistant token in the house
