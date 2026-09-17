@@ -12,13 +12,12 @@ Candidates are things expected to bite that have not been hit yet; they move up 
 
 | # | Date | Tool | Task | Steps taken | Expected | Actual | Severity | Workaround | Suggestion |
 |---|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | | |
+| 1 | 2026-09-17 | Alexa+ MCP Toolkit / simulator | Test account linking and MCP App rendering on the real Alexa+ surface | Read the docs ("Category SDK and MCP Toolkit are available to select partners only," [MCP Toolkit overview](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-overview.html), checked 2026-09-16); posted the question on the hackathon forum | Either toolkit/simulator access for participants, or an explicit confirmation there is none | Organizer reply, 2026-09-17: "No, there is no way for participants to get access to the toolkit or simulator. A self-built simulator or other front end for demoing are certainly options though!" | Minor | None needed — ADR-007 already committed to a self-built emulated host (the Hirz Simulator) as the primary demo surface before this answer; the reply confirms that path is the one Amazon expects, it doesn't change it | Ship toolkit/simulator access for hackathon participants (tracked below) |
 
-*No entries yet.* An entry dated 2026-09-15 about unreachable design-guide links was removed on 2026-09-17: the pages loaded on 2026-09-16, and the entry had no URL and no HTTP status, so it did not meet this file's own rule.
+An earlier entry dated 2026-09-15 about unreachable design-guide links was removed on 2026-09-17: the pages loaded on 2026-09-16, and the entry had no URL and no HTTP status, so it did not meet this file's own rule.
 
 ## Candidates (not yet hit)
 
-- Alexa+ add-on developer access is limited to select partners ("Category SDK and MCP Toolkit are available to select partners only", [MCP Toolkit overview](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-overview.html), checked 2026-09-16); no simulator access for hackathon participants; an emulated host had to be built. The author asks the organizers on the hackathon forum whether participants can get access; record the dated answer here and promote this to an entry.
 - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be invoked proactively.
 - AgentCore Runtime serves the Protected Resource Metadata at a path-shaped URL under the runtime ARN; whether Alexa's client follows `resource_metadata` from `WWW-Authenticate` or only looks at the origin root is unverified.
 - AgentCore Policy temporal quotas (25 policies per engine, 3 operators per policy, 24-hour window) versus a constitution's `ask` classes; changing temporal policies returns 409 on open sessions. Designed around with one generic temporal permit per TTL.

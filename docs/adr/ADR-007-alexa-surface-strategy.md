@@ -24,6 +24,6 @@
 
 **Interoperability proof.** One gallery and README screenshot of the same server and the same cards rendering in a second real MCP Apps host, to show the cards are standard MCP Apps and not something that works only in Hirz's simulator. Kept out of the video so the track story stays clean.
 
-**Access.** The MCP Toolkit is "available to select partners only" (Alexa+ docs, checked 2026-09-16). The author asks the organizers on the hackathon forum whether participants can get toolkit or simulator access; the dated answer goes in `docs/friction-log.md` either way.
+**Access.** The MCP Toolkit is "available to select partners only" (Alexa+ docs, checked 2026-09-16). The author asked the organizers on the hackathon forum whether participants can get toolkit or simulator access; the organizers confirmed on 2026-09-17 that no participant access exists and that a self-built simulator is an accepted path (`docs/friction-log.md` entry 1). This closes the question this ADR was written under uncertainty of, without changing the decision above.
 
 **Consequences:** The simulator must be honest (banner, transcript, badges) and must enforce Alexa+'s voice-only and option-count rules so the preview is faithful. `HIRZ_LLM=off` swaps the emulator for a scripted host so CI and credential-less judges can run the demo.

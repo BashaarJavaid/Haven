@@ -21,7 +21,7 @@ Two-stage judging: Stage One is a pass/fail check that the project fits the trac
 - [ ] **Image gallery**: the seven hand-designed screens (plan, verification, doorbell, and scorecard cards; the rule diff, check-in, and unlock approval on the phone); the AWS console screenshots (AgentCore Policy engine with the compiled constitution, a CloudWatch policy decision beside the signed command the home accepted, the KMS key policy showing one role, the Runtime hosting the MCP server); a refused unsigned command (`LINK_REJECTED`); the courier-correlation warning if it is not in the video; the Dad/dishwasher provenance plan; the Cedar view; the Alexa developer-console clip frame; the same cards in a second real MCP Apps host. The video does not tour the console; the gallery is where AWS Builder judges look.
 - [ ] **Newly created during the period** statement: repo created 2026-09-15, all code written during the submission window.
 - [ ] **AWS promotional credit** requested before **2026-10-21 12:00 PT**.
-- [ ] **Forum question** to the organizers about MCP Toolkit or simulator access posted, and the dated answer recorded in `docs/friction-log.md`.
+- [x] **Forum question** to the organizers about MCP Toolkit or simulator access posted, and the dated answer recorded in `docs/friction-log.md`: no participant access exists; a self-built simulator is an accepted path (answered 2026-09-17).
 
 ## Optional, worth doing
 
