@@ -10,7 +10,7 @@ The twin is how Hirz demonstrates every capability end to end with no hardware, 
 2. **Physics-lite, not random.** Numbers come from small models with named parameters so they stay plausible and reproducible. A judge who owns an EV should never see a home charger add 28 percent in half an hour.
 3. **Seeded and reproducible.** Every scenario run has a seed; the same seed produces the same trace.
 4. **Sim clock.** All twin models advance on `SimClock`, which can run at wall speed, at a multiplier, or jump to a timestamp. The scheduler and the planner use the injected clock, never `datetime.now()` directly.
-5. **Mixable.** A household can run real Home Assistant devices and a twin EV at the same time. The registry decides per domain, and `asset_bindings` can override per entity, which is how the demo runs one physical smart plug (the living-room light) inside an otherwise twin `devices` domain.
+5. **Mixable.** A household can run real Home Assistant devices and a twin EV at the same time. The registry decides per domain, and `asset_bindings` can override per entity, which is how the demo runs one physical smart plug (the living-room light) inside an otherwise twin `devices` domain. Falling back from a real binding to its twin when the device is absent is a **scenario and demo feature only**. In a real household an unreachable device is `unavailable; actual state unknown`, the twin never stands in for it, and a twin read-back never satisfies verify-after-act for a real device.
 6. **Real data where it is free.** Open-Meteo weather is a live feed, and electricity prices come from one of two real ComEd rate profiles (§2.6): the published Time-of-Day rate table or the live Hourly Pricing feed. The twin consumes them so the optimizer's numbers are grounded in a real tariff and real weather.
 
 ---
@@ -65,7 +65,7 @@ State machines with realistic latencies (lock 1.5 s, camera arm 0.5 s) and failu
 
 ### 2.10 Contacts and calls
 
-A scenario can inject an inbound-call event with a presented number and a transcript summary (this is what the member relays to Alexa), and can script the trusted contact's response to a check-in (`genuine`, `not_genuine`, no answer, delay). The contact may live in another Hirz household: in the demo, Malik is a trusted contact of his parents' household and answers from his own app.
+A scenario can inject an inbound-call event with a presented number and a transcript summary. That event is the state of the world, not something Hirz knows: Hirz cannot see a call, and it learns only what the member then says to Alexa. If the member does not read the number out, no tool output may say anything about the number, and the scenario asserts that. A scenario can also script the trusted contact's response to a check-in (`genuine`, `not_genuine`, no answer, delay). The contact may live in another Hirz household: in the demo, Malik is a trusted contact of his parents' household and answers from his own app.
 
 ---
 
@@ -84,29 +84,33 @@ adapters: {devices: twin, energy: twin, calendar: twin, doorbell: twin, contacts
 timeline:
   - at: "17:04"   ; event: call.inbound           ; presented_number: "+1 312 555 0199" ; claim: "Malik in trouble, needs five hundred dollars"
   - at: "17:05"   ; event: voice                  ; member: mom ; text: "Malik just called from a strange number. He says he's in trouble and needs five hundred dollars. Is it really him?"
-  - at: "17:06"   ; event: contact.checkin_reply  ; contact: malik ; reply: not_genuine
+  - at: "17:06"   ; event: contact.checkin_reply  ; contact: malik ; reply: not_genuine   # the check-in asked about the specific request: another number, $500
+  - at: "17:07"   ; event: voice                  ; member: mom ; text: "Alexa, is it him?"           # Alexa cannot speak unprompted; the card and Mom's phone already show the answer
   - at: "17:25"   ; event: doorbell.press         ; expected_visitor: null      # courier-pickup pattern: unexpected visitor while a CRITICAL case is recent
 assert:
   audit_sequence_includes:
     - VERIFY                                       # assess_request_risk lands CRITICAL; a VerificationCase opens
     - VERIFIED                                     # Malik's own app: not_genuine
     - EXECUTED:communication.contact_trusted_contact   # courier correlation: warn Mom, notify the contact Hirz verified
-  verification: {band: critical, presented_channel_verified: false, status: not_genuine}
+  verification: {band: critical, presented_number: not_provided, status: not_genuine}
+  speakable_never_mentions: [number_match]          # Mom never read the number out, so Hirz says nothing about it
   never:
     - EXECUTE:finance.*
     - EXECUTE:security.door_unlock
 ```
+
+Three short corpus scenarios sit beside it and are asserted the same way. **`scenarios/parents-scam-no-answer.yaml`**: the same call, Malik never replies, the case ends `no_answer`, and Alexa says not to send anything and to call the saved number. **`scenarios/parents-ordinary-request.yaml`**: "Dad wants to know when dinner is" lands LOW with no warning, and checking with Dad is still offered. **`scenarios/stranger-in-window.yaml`** (Malik's home): a stranger rings at 19:04 inside Mom's expected window; the approval reads "Someone is at the front door. Mom is expected now.", Malik denies it on his phone, and the assertions are `ASK_CONSTITUTION:security.door_unlock`, `REJECTED`, and never `EXECUTED:security.door_unlock`.
 
 **`scenarios/demo-evening.yaml`** (Malik's home):
 
 ```yaml
 id: demo-evening
 seed: 20261013
-household: constitutions/quinn-home.yaml            # household graph + constitution seed; starts at v7 WITHOUT never_for: [unknown_visitor]
+household: constitutions/quinn-home.yaml            # household graph + constitution seed; starts at v7 WITHOUT never_for: [unexpected_visitor]
 clock: {start: "2026-10-13T17:30:00-05:00", speed: 60}
 adapters: {devices: twin, ev: twin, energy: real, wearable: twin, calendar: twin, doorbell: twin, contacts: twin}
 rate_plan: comed_time_of_day                          # published ComEd rate table; a second corpus scenario runs the same evening on comed_hourly
-bindings: {light.living_room: ha}                      # one physical smart plug; falls back to twin if the device is absent
+bindings: {light.living_room: ha, lock.front_door: ha}  # one physical smart plug, and Home Assistant's demo lock (`real API, demo devices`, shown as simulated) so the unlock rides the signed-command path in AWS mode; both fall back to twin if absent (scenario mode only)
 initial:
   ev: {soc: 0.34, plugged_in: true}
   battery: {soc: 0.55}
@@ -117,14 +121,16 @@ timeline:
   - at: "17:31"   ; event: voice                  ; member: malik ; text: "From now on, never unlock the door for someone we're not expecting."
   - at: "17:32"   ; event: constitution.activate  ; member: malik ; patch: fixtures/patch-never-unexpected-visitor.yaml   # passkey activation in the app; the recorded patch is what HIRZ_LLM=off uses in place of the drafted one, labeled as recorded
   - at: "17:33"   ; event: voice                  ; member: malik ; text: "What's going on tonight?"
-  - at: "17:35"   ; event: voice                  ; member: malik ; text: "Do it, but don't charge the car past 50. I'm not driving tomorrow."
+  - at: "17:35"   ; event: voice                  ; member: malik ; text: "Don't charge the car past 50. I'm not driving tomorrow."   # the constraint is confirmed at once; the plan is `refreshing` and cannot be approved yet
+  - at: "17:36"   ; event: voice                  ; member: malik ; text: "Do it."                           # approves the revised plan, after it landed
   - at: "18:40"   ; event: doorbell.press         ; expected_visitor: null
   - at: "18:40"   ; event: voice                  ; member: malik ; text: "Let them in."                     # DENY_CONSTITUTION under the rule activated at 17:32
   - at: "18:58"   ; event: doorbell.motion        ; classification: vehicle
   - at: "19:04"   ; event: doorbell.press         ; expected_visitor: mom
   - at: "19:04"   ; event: voice                  ; member: malik ; text: "That's my mom, let her in."
-  - at: "19:05"   ; event: app.approve            ; member: malik ; class: security.door_unlock   # security is never approved by voice
-  - at: "22:40"   ; event: voice                  ; member: dad   ; text: "Don't run the dishwasher tonight, I'm working in the kitchen until eleven."
+  - at: "19:05"   ; event: app.approve            ; member: malik ; class: security.door_unlock   # security is never approved by voice; the screen says "Mom is expected now", not "unlock for Mom"
+  - at: "19:06"   ; event: link.replay            ; of: security.door_unlock                        # the accepted unlock command is sent again: refused, LINK_REJECTED (AWS mode; local mode runs Link's verifier with the development key)
+  - at: "22:40"   ; event: voice                  ; member: dad   ; text: "Don't run the dishwasher until I'm done in the kitchen at eleven."   # arrives on Dad's own linked account; provenance is the account, never the voice
   - at: "23:05"   ; event: presence.sleep         ; member: mom ; zone: guest_room
   - at: "23:30"   ; event: voice                  ; member: malik ; text: "Optimize energy tonight."      # appliance_start after 22:00 is ASK under quinn-home
   - at: "23:31"   ; event: voice                  ; member: malik ; text: "Yes."                          # voice approval is allowed for non-security classes
@@ -136,6 +142,7 @@ assert:
     - CONSTITUTION_ACTIVATED             # v8, before any plan approval exists
     - PLAN_CREATED
     - PLAN_REVISED                       # after "don't charge past 50"
+    - APPROVED                           # "Do it", only after the revised plan landed
     - EXECUTE:energy.battery_dispatch    # discharge through the Mid-Day Peak
     - EXECUTE:energy.hvac_adjust
     - DENY_CONSTITUTION:security.door_unlock    # 18:40, citing constitution v8
@@ -143,14 +150,15 @@ assert:
     - ASK_CONSTITUTION:security.door_unlock
     - APPROVED
     - EXECUTED:security.door_unlock
-    - EXECUTED:security.door_lock
+    - EXECUTED:security.door_lock        # the relock, run by Hirz Link from its own clock
+    - LINK_REJECTED                      # the replayed unlock
     - PLAN_REVISED                       # after Dad's kitchen constraint
     - ASK_CONSTITUTION:energy.appliance_start   # the household's own rule: ask outside 07:00–22:00
     - APPROVED                           # by voice; appliance_start is not a security class
     - EXECUTED:energy.ev_charge          # in the Overnight period, after 21:00
     - EXECUTED:energy.appliance_start    # after Dad's constraint and Malik's approval
   plan_summary:
-    estimated_savings_usd: {min: 1.00, max: 8.00}   # provisional; ROADMAP item 17 derives the range from the backtest and replaces it
+    estimated_savings_usd: {min: 1.00, max: 8.00}   # against the timer baseline; provisional; ROADMAP item 17 derives the range from the backtest and replaces it
     peak_kwh_avoided: {min: 5.0}
     comfort_violations_minutes: {max: 0}
   ev_soc_at: {"+1d 06:30": {min: 0.50}}
@@ -159,7 +167,7 @@ assert:
     - EXECUTE:security.access_code_share
 ```
 
-Event kinds: `voice`, `app.approve|deny` (a member acting in the companion app; the only way a `security.*` approval can happen), `presence.arrive|leave|sleep|wake`, `calendar.add|remove`, `tariff.spike|update`, `weather.update`, `ev.drive|plug|unplug`, `call.inbound`, `contact.checkin_reply`, `doorbell.press|motion`, `device.fail`, `wearable.recovery`, `constitution.activate` (optionally with a recorded `patch`), `clock.jump`.
+Event kinds: `voice`, `app.approve|deny` (a member acting in the companion app; the only way a `security.*` approval can happen), `presence.arrive|leave|sleep|wake`, `calendar.add|remove`, `tariff.spike|update`, `weather.update`, `ev.drive|plug|unplug`, `call.inbound`, `contact.checkin_reply`, `doorbell.press|motion`, `device.fail`, `device.manual_change` (someone used the thermostat or the lock by hand: `OUT_OF_BAND_CHANGE`, and a manual hold for comfort devices), `link.replay|tamper|readdress` (the tamper playground's moves), `link.offline`, `wearable.recovery`, `constitution.activate` (optionally with a recorded `patch`), `clock.jump`.
 
 `voice` events are delivered to the simulator's emulated host (or, in headless test mode, to a scripted host that calls the tools the emulator would call, so tests don't need Bedrock).
 
@@ -175,7 +183,7 @@ hirz scenario step scenarios/demo-evening.yaml --to "18:40"         # pause befo
 
 Scenario runs are recorded (`scenario_runs`) with the seed, the adapter mix, and the resulting audit range, so a demo video can cite the exact run it shows.
 
-**Numbers are derived, never typed.** The demo household is on ComEd's Time-of-Day rate, whose all-in Mid-Day Peak price is several times its Overnight price, so the flexible load in the demo (about 12 kWh of EV charging, one home-battery cycle, a dishwasher, HVAC pre-conditioning) is worth dollars a night rather than cents. The assertion range in `plan_summary` is provisional until `ROADMAP.md` item 17 replaces it: the backtest script pulls a year of ComEd hourly history through the feed's date-range parameters, runs the planner on the demo loads for every day on both rate profiles, and writes the observed spread, the annualized saving per profile, the worst spike night avoided, and the hours charged at negative prices. The script and its data are kept in `scripts/` so every figure is reproducible. The scorecard leads with dollars (tonight, then annualized from the backtest); `peak_kwh_avoided` comes second. The `tariff.spike` event remains a twin-only test of the planner under a price spike and is never used to inflate a demo number.
+**Numbers are derived, never typed.** The demo household is on ComEd's Time-of-Day rate, whose all-in Mid-Day Peak price is several times its Overnight price, so the flexible load in the demo (about 12 kWh of EV charging, one home-battery cycle, a dishwasher, HVAC pre-conditioning) is worth dollars a night rather than cents. The assertion range in `plan_summary` is provisional until `ROADMAP.md` item 17 replaces it: the backtest script pulls a year of ComEd hourly history through the feed's date-range parameters, runs the planner on the demo loads for every day on both rate profiles, and writes the observed spread, the annualized saving per profile, the worst spike night avoided, and the hours charged at negative prices. The script and its data are kept in `scripts/` so every figure is reproducible. A reproducible number can still be a weak comparison, so the saving is measured against a timer schedule a careful household already uses, with "do everything now" and the cheapest-slots heuristic beside it, all held to the same comfort, the same energy into the car, and a battery that ends no emptier than it began. On Hourly Pricing the backtest plans from what was knowable at the time and is billed at realized prices; state carries between days; it reports a distribution, including the days on which Hirz adds little, for a home with solar, battery, and car, a home with a car only, and a home with no car; and the Time-of-Day replay before 2026-07-23 is labeled a counterfactual simulation (`ARCHITECTURE.md` §5.4). The scorecard leads with dollars (tonight, then annualized from the backtest); `peak_kwh_avoided` comes second. The `tariff.spike` event remains a twin-only test of the planner under a price spike and is never used to inflate a demo number.
 
 ---
 

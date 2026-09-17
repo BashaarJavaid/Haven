@@ -37,7 +37,7 @@ Principles taken from the guide: reduced content density (fewer metadata fields,
 3. **The accent color appears only on the final-action button** (Approve, Activate, Check with Malik).
 4. **Two badge states on cards: `live` and `simulated`.** `real` observations are live; `twin` and `real API, demo devices` both show as simulated, the more conservative reading. A published rate table is labeled *published ComEd rate*. The full three-way `source` stays in the data, the companion app's detail view, and the audit trail.
 5. **No internal IDs, class names, or JSON** on any card.
-6. **Three motions, all CSS transitions, no animation library:** the EV bar moves when the plan changes by voice; the verification card goes from *pending* to the result; the door goes locked → unlocked → relocked.
+6. **Three motions, all CSS transitions, no animation library:** the EV bar moves when the plan changes by voice; the verification card goes from *pending* to the result, on its own, because Alexa cannot speak unprompted; the door goes locked → unlocked → relocked.
 
 ## 4. The seven hand-designed screens
 
@@ -46,12 +46,12 @@ These appear on camera, so they are designed by hand. Every other companion page
 | # | Screen | Surface | Inline content | Fullscreen |
 |---|---|---|---|---|
 | 1 | Plan card | Echo Show | Dollars saved tonight (Display size); three rows (battery through the peak, pre-warm for Mom, car after 9); Approve | Timeline, all actions, alternatives, the annualized figure |
-| 2 | Verification card | Echo Show | One headline ("That number isn't one of Malik's"); up to three signals; status chip (*checking with Malik* → *Malik is fine*) | none |
+| 2 | Verification card | Echo Show | One headline ("This looks like a scam. Don't send anything yet."); up to three signals; status chip (*checking with Malik* → *Malik says it wasn't him*; also *Malik hasn't answered*) | none |
 | 3 | Doorbell card | Echo Show | Snapshot; one context line ("Nobody is expected right now" / "A vehicle arrived at 6:58. Mom is expected at 7:00"); request-unlock button; for `security.*` the approval state reads *approve on your phone* and there is no Approve button | none |
 | 4 | Scorecard | Echo Show | Dollars saved, annualized figure, peak kWh avoided | Counts (autonomous, asked, blocked, verified) and the decision list |
-| 5 | Rule diff and Activate | Phone | The English sentence; a before-and-after line ("Unexpected visitor: ask on phone → never"); a collapsed line with the compiled Cedar; Activate (passkey) | n/a |
-| 6 | Check-in | Phone | "Your mom is checking it's really you. Someone called her claiming to be you."; two buttons: **It was me** / **It wasn't me. I'm fine.** | n/a |
-| 7 | Unlock approval | Phone | "Unlock the front door for Mom, 10 minutes"; the rule and band in one line; Approve (passkey) / Deny | n/a |
+| 5 | Rule diff and Activate | Phone | The English sentence; up to three derived situation lines ("Unexpected visitor: ask on phone → never"; "Expected arrival: still asks on your phone"); one caveat line ("Hirz does not identify the visitor"); a collapsed line with the compiled Cedar; Activate (passkey). The situation lines are computed by evaluation, never written by a model (`docs/constitution.md` §3) | n/a |
+| 6 | Check-in | Phone | "Your mom is checking it's really you. Did you just call her from another number asking for $500?"; three buttons: **No, that wasn't me** / **Yes, that was me** / **I'll call her** | n/a |
+| 7 | Unlock approval | Phone | The snapshot; "Someone is at the front door. Mom is expected now. Unlock for 10 minutes?" (the schedule is context, never the visitor's identity); the rule and band in one line; Approve (passkey) / Deny | n/a |
 
 ## 5. Identity
 
@@ -69,5 +69,6 @@ Conversation design is design. `speakable.headline` is about 20 words or fewer a
 
 - Playwright snapshots of the five cards at 768×480, light and dark (`ROADMAP.md` item 27).
 - Density: an inline card has at most three rows and one primary action.
-- Contrast and focus order checked on the seven screens; every action has a voice equivalent through Alexa (`ARCHITECTURE.md` §5.14).
+- Contrast and focus order checked on the seven screens; every action can be started by voice, and the two that cannot be finished by voice (a security approval, a rule activation) finish on phone screens held to the same bar (`ARCHITECTURE.md` §5.14).
+- Hallway tests of screens 5, 6, and 7 with people who did not build them (`ROADMAP.md` item 40a): can they say what the rule will do, what Malik is being asked, and that the schedule is not the visitor's identity?
 - The three hand-designed phone screens match this spec (`ROADMAP.md` item 28).

@@ -142,3 +142,71 @@ All notable changes are documented here. The format follows
     order in which below-the-line items are let go; Phase 9 gains the caregiver view across
     homes, the activity-signal idea, and trademark clearance. Approved spend: one KMS key, one
     S3 bucket, the bridge stack for the recording, and rate-limited Bedrock use by the hosted demo.
+- 2026-09-17: **Second design revision, after an external fifteen-point critique.** Each point was
+  accepted or rejected on merit with the author and applied in one pass. No code existed, so no
+  code changed. The author said build time is not the constraint, so nothing was cut.
+  - **Authorization chain (ADR-009 amended, ADR-003's permit tightened).** The signing Lambda
+    recomputes the action hash instead of trusting the worker's; the command envelope carries
+    `home_id`; Hirz Link refuses an operation it already executed, so one approval yields one
+    operation; temporal permits match on class, household, and TTL group, because Cedar permits
+    are alternatives and a ten-minute approval could otherwise ride the thirty-minute permit;
+    every policy is scoped to its household, and hosted-demo households stay on the local
+    evaluator. The worker calls the Gateway with a machine token, so the requester's role is
+    now described as an input Hirz supplies, not as independently evaluated.
+  - **The lead claim is scoped.** "Nothing to act with" covers a bug or a bypass path, not a
+    compromised worker, which can still claim an approval happened. New threat-model row says
+    No. **ADR-010** and roadmap item 38d (below the cut line) close it for `security.*`: the
+    member's passkey assertion over the action hash is verified inside the signer, with keys
+    enrolled through a separate `hirz-passkeys` Lambda the worker never touches (approved
+    pay-per-use resource). It will be Partial, because Hirz still serves the approval page.
+  - **Safety after the action.** A bounded operation is authorized whole: the signed command
+    carries its revert, and Hirz Link stores it and runs the relock from its own clock, offline
+    and across restarts. A real device is never replaced by its twin outside a scenario or demo
+    household, and a twin read-back never verifies a real device.
+  - **What the rules cover.** Hirz governs the actions Hirz takes. New threat-model row for
+    parallel control paths (No); a deployment rule; *managed through Hirz* / *not managed* on
+    the Household page; new event `OUT_OF_BAND_CHANGE`; a manual thermostat change becomes a
+    two-hour hold the planner works around. The tagline is unchanged.
+  - **Visitor semantics.** A schedule is context, not identity. Approval text is "Someone is at
+    the front door. Mom is expected now.", never "Unlock for Mom"; `unknown_visitor` is renamed
+    `unexpected_visitor` and defined as a press matching no arrival window; the drafter must say
+    when a sentence ("someone I don't know") cannot be expressed; new scenario
+    `stranger-in-window`.
+  - **Scam check.** Hirz no longer says "That number isn't one of Malik's": it cannot see the
+    call and Mom never read the number out. A number is compared only when given, and a match is
+    never proof. The check-in asks about the specific request, with three answers; new status
+    `will_call`; `genuine` is never advice to pay; model signals are unioned with keyword
+    signals; the check is offered at every band; new scenarios for no answer and an ordinary
+    request.
+  - **Honest asynchronous conversation.** Alexa cannot speak unprompted, so Mom asks again
+    before hearing Malik's answer, and the card updates on its own. `revise_household_plan`
+    keeps the no-solver rule: it speaks the constraint, marks the plan `refreshing`, and the
+    card re-fetches; `approve_action` refuses a `refreshing` plan; "Starting the charge now"
+    no longer promises an outcome the boundary has not allowed. The worker is driven by a
+    one-minute tick because App Runner throttles idle CPU (the rule's spend awaits the author's
+    OK). Whole-interaction times are measured, not only the acknowledgment.
+  - **Energy experiment.** The headline saving is against a timer schedule, with "do everything
+    now" and the cheapest-slots heuristic beside it, all held to equal comfort, delivered EV
+    energy, and final battery state. The backtest has no hindsight (plan on knowable prices,
+    bill at realized ones), carries state between days, reports a distribution, runs three
+    households including one with no solar or battery, and labels the Time-of-Day replay before
+    2026-07-23 a counterfactual. Whether ComEd serves day-ahead history is checked in item 17.
+    An infeasible problem keeps the last feasible plan and names the constraint to relax.
+  - **Contradictions resolved.** Un-accepted memory is never planner input. Provenance is the
+    linked account and surface, with `claimed_author` for a name in a sentence. "No model
+    participates in any decision" became "no model makes a decision". "Every action has a voice
+    equivalent" became "can be started by voice". Dad's sentence no longer says "tonight". A
+    property-based test compares the YAML evaluator with the compiled policy.
+  - **Novelty claims.** "Nothing plans across…" and "every entrant… none is faithful" removed;
+    EMHASS and Home Assistant's entity exposure are named; ADR-005 records EMHASS as the
+    benchmark, not a component.
+  - **Additions.** The rule preview's situation lines are derived by evaluating both versions,
+    never written by a model; a household pause (voice may pause, only the app resumes; events
+    `AUTONOMY_PAUSED`, `AUTONOMY_RESUMED`); more than one passkey per member and a recovery
+    code; a tamper playground (38e); hallway tests with five to eight people (40a).
+  - **Demo.** The video's close is the accepted unlock command replayed and refused; the
+    Skill-bridge clip moves to the gallery. The demo lock is Home Assistant's demo lock so the
+    unlock rides the signed path.
+  - **Rejected on merit:** changing the tagline; a positive-rule beat in the video; EMHASS as a
+    component; a read-and-disclosure constitution domain (Phase 9); separate "receipt" and
+    "effort metric" features (the audit tool and the scorecard already are those).

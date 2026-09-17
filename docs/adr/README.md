@@ -11,3 +11,4 @@ One file per consequential decision, each with the alternatives that were reject
 - [`ADR-007-alexa-surface-strategy.md`](./ADR-007-alexa-surface-strategy.md) — Build to the real add-on contract; demo through an emulated host; one read-only clip through the community Skill bridge
 - [`ADR-008-agentcore-topology.md`](./ADR-008-agentcore-topology.md) — Runtime hosts the MCP server; Gateway + Policy is the second enforcement point; cost posture
 - [`ADR-009-signed-commands-home-agent.md`](./ADR-009-signed-commands-home-agent.md) — The home obeys only commands the boundary signed; Hirz Link holds the Home Assistant token in the house
+- [`ADR-010-passkey-verified-approvals.md`](./ADR-010-passkey-verified-approvals.md) — Security approvals proven to the signer by the member's passkey, so the worker can relay an approval and cannot make one (below the cut line)
