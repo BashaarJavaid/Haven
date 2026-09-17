@@ -183,8 +183,8 @@ All notable changes are documented here. The format follows
     keeps the no-solver rule: it speaks the constraint, marks the plan `refreshing`, and the
     card re-fetches; `approve_action` refuses a `refreshing` plan; "Starting the charge now"
     no longer promises an outcome the boundary has not allowed. The worker is driven by a
-    one-minute tick because App Runner throttles idle CPU (the rule's spend awaits the author's
-    OK). Whole-interaction times are measured, not only the acknowledgment.
+    one-minute tick because App Runner throttles idle CPU (the rule's spend was approved by the author
+    on 2026-09-17). Whole-interaction times are measured, not only the acknowledgment.
   - **Energy experiment.** The headline saving is against a timer schedule, with "do everything
     now" and the cheapest-slots heuristic beside it, all held to equal comfort, delivered EV
     energy, and final battery state. The backtest has no hindsight (plan on knowable prices,
