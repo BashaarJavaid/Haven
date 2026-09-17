@@ -6,7 +6,7 @@
 
 *Observe → Understand → Plan → Evaluate Risk → Check Authority → Act → Verify → Remember. Every action Haven takes passes through that loop, and every step of it is recorded.*
 
-> Built for the **Build, Ship, Shape: Amazon Developer Hackathon 2026** — Alexa+ track (primary), Ring track (secondary), AWS Builder mini-challenge. Designed as a startup, not a weekend project: see [`ROADMAP.md`](./ROADMAP.md) for the hackathon cut line and what comes after it.
+> Built for the **Build, Ship, Shape: Amazon Developer Hackathon 2026** — Alexa+ track (primary), Ring track (secondary, kept only if the Ring sandbox access gate in `ROADMAP.md` item 34 passes), AWS Builder mini-challenge. Designed as a startup, not a weekend project: see [`ROADMAP.md`](./ROADMAP.md) for the hackathon cut line and what comes after it.
 
 ---
 
@@ -14,13 +14,13 @@
 
 Today's smart home follows commands. You say "set the thermostat to 72", "charge the car", "remind Mom about her pills", "add milk". The assistant executes each one in isolation. It has no model of who lives in the house, what they need tonight, what electricity costs at 6 PM, which requests are normal and which are dangerous, or how much authority it has been given.
 
-Alexa+ can now call third-party tools over MCP, orchestrate multi-turn conversations, and render interactive UI. What it cannot do is *understand the household as a whole*, because no shared household model exists for it to reason over. Three concrete gaps:
+Alexa+ can now call third-party tools over MCP, orchestrate multi-turn conversations, and render interactive UI. Household agents built on it already follow a common pattern: an allowlist of actions, a human-approval step for the risky ones, and an audit trail. That pattern is necessary and Haven has it. It is not sufficient, for three reasons:
 
-1. **No household model.** Preferences, routines, people, assets, and constraints live in ten apps and nobody's head. The assistant can't plan across them.
-2. **No permission boundary.** An agent that can unlock doors, move money, and change the thermostat while someone sleeps needs an explicit, user-authored answer to "how much authority do you have?" Nothing today provides one.
-3. **No protection posture.** The same channel that takes "turn off the lights" also takes "Dad's stranded, send money to this number". Nothing distinguishes a routine request from a high-risk one, or verifies identity from a trusted record instead of from the caller.
+1. **The boundary is the developer's, not the household's.** An allowlist is written in code by whoever built the agent. A family that can unlock doors, move money, and change the thermostat while someone sleeps needs to *write* the answer to "how much authority do you have?" themselves, change it, and see proof that it was enforced somewhere the agent cannot reach.
+2. **One user, one command at a time.** Preferences, routines, people, assets, and constraints live in ten apps and nobody's head. Nothing plans across Mom's comfort, the car's deadline, tonight's prices, and Dad's "kitchen is busy until 11" in one decision, with numbers it can defend.
+3. **Trust comes from the caller.** The same channel that takes "turn off the lights" also takes "Dad's stranded, send money to this number". An assistant with no record of who Dad is and how to reach him can only take the caller's word for it.
 
-Haven closes all three with one thesis: **bounded autonomy**. Understand the household, negotiate competing needs, take safe autonomous action, and know when to ask.
+Haven's thesis is **bounded autonomy**: understand the household, negotiate competing needs, take safe autonomous action inside a boundary the household wrote, and know when to ask.
 
 ## What it does
 
@@ -28,32 +28,36 @@ You get home at 5:30 PM.
 
 > **You:** Alexa, what's going on tonight?
 >
-> **Alexa (Haven):** You're home earlier than usual. Your parents are coming at 7, the car is at 34 percent, and electricity prices spike at 6. I can pre-warm the living room for your mom, charge the home battery before prices rise, hold the car until the cheap window after midnight, and have everything ready by 7. Estimated savings tonight: about six dollars.
+> **Alexa (Haven):** You're home earlier than usual. Your parents are coming at 7, the car is at 34 percent, and electricity prices spike at 6. I can pre-warm the living room for your mom, charge the home battery before prices rise, hold the car until the cheap window after midnight, and have everything ready by 7. On your rate the dollar saving is small; the bigger win is keeping the evening peak off the grid, and the numbers are on the card.
 
 The screen shows the plan as a card: each action, when, why, and the numbers. You approve it, or change it by voice ("I'm not driving tomorrow, 50 percent is fine"), and the plan re-optimizes.
 
 At 6:15 the phone rings.
 
-> **You:** Alexa, Dad just called from a new number. He says he's stranded and needs me to send money to a friend.
+> **You:** Alexa, send five hundred dollars to this number. It's for Dad, he's stranded.
 >
-> **Alexa (Haven):** That number isn't one of Dad's verified contacts, and the request combines urgency, money, and a new channel, which is the pattern of a family impersonation scam. Before anything else, I've sent a check-in to Dad's own Haven app and can call his verified number. Want me to?
+> **Alexa (Haven):** I can't send money; your household rules never allow it. And this request has the pattern of a family impersonation scam: urgency, money, and a number that isn't one of Dad's verified contacts. I can check with Dad through his own Haven app, or call his verified number. Want me to?
 
-Dad taps "I'm fine" on his phone. Haven never used anything the caller said as a fact.
+Dad taps "I'm fine" on his phone. Haven refused the request under a rule the household wrote, and never used anything the caller said as a fact. The same flow protects a parent living alone whose Echo is linked to their own Haven.
 
 Next morning:
 
-> **Alexa (Haven):** Good morning. Overnight I charged the car to 52 percent in the 1 AM window, ran the dishwasher after your dad finished in the kitchen, and kept the house within your comfort band. Energy saved yesterday: eight dollars ten. One request was flagged and verified. Your recovery score is lower than usual and your first meeting is at 10, so your Recovery Morning preferences are ready if you want them.
+> **Alexa (Haven):** Good morning. Overnight I charged the car to 52 percent in the 1 AM window, ran the dishwasher after your dad finished in the kitchen, and kept the house within your comfort band. The scorecard has yesterday's peak kilowatt-hours avoided and the cost saved. One request was flagged and verified, and one action asked for your OK under your own rule.
 
-Every one of those sentences is backed by a structured record: what Haven did, why, under which rule of the household constitution, at what risk band, and who approved it.
+Every one of those sentences is backed by a structured record: what Haven did, why, under which rule of the household constitution, at what risk band, and who approved it. Every number Haven speaks comes from a cited scenario run against real price and weather data; on a flat real-time tariff like ComEd's the nightly dollar saving is modest and Haven says so, which is why the scorecard leads with peak kilowatt-hours avoided.
 
-## The four innovations
+## What Haven adds
+
+Approval gates, an audit ledger, and a simulated Alexa+ host are the baseline for a household agent, and Haven has all three. The four things below are what Haven adds on top of that baseline.
 
 | | What it is | Why it matters |
 |---|---|---|
-| **Household Graph** | A typed, versioned model of people, roles, trusted contacts, assets, devices, schedules, preferences, and policies. | Lets one agent reason *across* domains: Mom's temperature preference, the car's deadline, tonight's prices, and Dad's kitchen constraint in one plan. |
-| **Household Constitution** | A user-authored document that states, per action class and per member, what Haven may do automatically, what it must ask about, and what it may never do. Authored as a form, as YAML, or in plain English. Compiled to Cedar and enforced twice: in Haven and at the AWS tool boundary. | Answers the question every agentic home has to answer and none do: how much authority does the AI have? |
-| **Risk-adjusted autonomy** | Every proposed action is classified by impact, reversibility, and uncertainty into a risk band. The band sets a floor the constitution can tighten but never loosen. Low: act. Medium: constitution decides. High: ask. Critical: never act autonomously; verify. | Makes "safe autonomous action" a deterministic property of the system rather than a hope about the model. |
-| **Explainable autonomy** | Every action carries what, why, which rule, what was considered and rejected, and what the outcome was, as data. Alexa narrates the data; Haven never scripts Alexa's speech. | This is what Alexa+ is built for, and it is what makes an audit trail a product feature rather than a compliance artifact. |
+| **Household Constitution, compiled to Cedar, enforced twice** | A document the household writes, as a form, as YAML, or in plain English, stating per action class and per member what Haven may do on its own, what it must ask about, and what it may never do. Every version compiles to a Cedar/Dogwood policy set that AgentCore Policy enforces at the AWS tool boundary, outside Haven's process, including a temporal "approval must precede action" rule. | The boundary belongs to the family, not the developer, and the proof that it held comes from an engine the agent cannot reach. |
+| **A real planner over real prices** | A rolling-horizon MILP schedules the EV, the home battery, HVAC, and appliances against live utility prices and weather, per-occupant comfort bands, and member constraints, and reports savings against a baseline plan solved with the same model. A physics twin supplies every device that is not real, labeled as such. | The savings on the scorecard are computed, not typed, and the binding constraints and rejected alternatives are outputs of the model rather than a story about it. |
+| **Multi-member coordination with provenance** | Each member's constraints and preferences keep their owner and time: "Dad, 22:40: kitchen in use until 23:00" survives into the plan, the explanation, and the audit row. Conflicts between members are returned as data with the people involved, never silently resolved. | A household is not one user. The plan can say whose request moved the dishwasher, and why. |
+| **Verification from the household's own records** | Trusted contacts have channels verified out of band at setup. A request is checked against those records and confirmed through the subject's own app or verified number, never through anything the caller supplied. Money never moves; the classes exist so the constitution can forbid them provably. | "Is this really Dad?" is answered by the graph, not by the person asking. |
+
+Underneath all four: a deterministic risk engine whose bands set floors the constitution can tighten but never loosen, and a pipeline in which every action carries what, why, which rule, and what was rejected, as data that Alexa narrates. Those are the mechanisms that make the four hold; they are not the claim.
 
 ## Architecture
 
@@ -100,14 +104,17 @@ graph TD
     Twin["Digital Twin + Scenario Engine (thermal, battery, EV, solar, occupancy, events, sim clock)"] -.-> Adapters
 
     subgraph AWS["AWS (AgentCore + Bedrock)"]
-        RT["AgentCore Runtime (hosts MCP server)"]
+        RT["AgentCore Runtime (hosts the MCP server role)"]
+        WK["Worker service (App Runner: scheduler, executor, pollers, companion API, webhooks)"]
         GW["AgentCore Gateway + Policy (Cedar compiled from the constitution, temporal approval rules)"]
         Mem["AgentCore Memory"]
         Id["AgentCore Identity (outbound credential vault)"]
-        BR["Bedrock: Claude Haiku 4.5 / Sonnet 5, Nova Lite (emulator)"]
+        BR["Bedrock: Claude Haiku 4.5 / Sonnet 5; emulator on Haiku 4.5 by default, Nova Lite selectable"]
         Sched["EventBridge Scheduler + Lambda ticks"]
     end
     MCP -.-> RT
+    Exec -.-> WK
+    API -.-> WK
     Exec -.-> GW
     Memory -.-> Mem
     Adapters -.-> Id
@@ -139,7 +146,7 @@ graph TD
 | Storage | PostgreSQL 16 (household graph, constitution versions, plans, approvals, audit chain) + AgentCore Memory (conversational, preference extraction) | Relational integrity for a hash chain; graph as tables + JSONB ([ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md)) |
 | Surfaces | React + TypeScript: MCP App (`@modelcontextprotocol/ext-apps`), companion app, simulator | The MCP Apps SDK and the Alexa tooling are TypeScript ([ADR-001](./docs/adr/ADR-001-python-core-typescript-surfaces.md)) |
 | Alexa+ | MCP 2025-11-25, Streamable HTTP, OAuth 2.1 + PKCE S256, Protected Resource Metadata, MCP Apps for visuals | The add-on contract, verbatim ([ADR-007](./docs/adr/ADR-007-alexa-surface-strategy.md)) |
-| AWS | AgentCore Runtime, Gateway, Policy, Memory, Identity; Bedrock (Claude Haiku 4.5 / Sonnet 5; Nova Lite for the emulator); EventBridge Scheduler + Lambda; CDK (TypeScript) | AWS runs Haven's agentic state and enforcement, not just its hosting ([ADR-008](./docs/adr/ADR-008-agentcore-topology.md)) |
+| AWS | AgentCore Runtime, Gateway, Policy, Memory, Identity; Bedrock (Claude Haiku 4.5 / Sonnet 5; the emulator runs Haiku 4.5 by default with Nova Lite selectable); EventBridge Scheduler + Lambda; CDK (TypeScript) | AWS runs Haven's agentic state and enforcement, not just its hosting ([ADR-008](./docs/adr/ADR-008-agentcore-topology.md)) |
 | Twin | Physics-lite models with a simulated clock and a YAML scenario DSL | Everything is demonstrable end to end with no hardware, and every scenario is an integration test ([ADR-006](./docs/adr/ADR-006-twin-first-adapters.md)) |
 | Ops | Docker Compose (Postgres, Home Assistant demo, Haven), OpenTelemetry → CloudWatch via AgentCore Observability, GitHub Actions (ruff / mypy strict / pytest 80% gate / tsc / vitest / playwright) | |
 
@@ -172,9 +179,8 @@ Haven/
 │   ├── api/                        # companion API (FastAPI)
 │   └── cli.py                      # haven CLI: decide, plan, scenario, verify-audit, doctor
 ├── apps/
-│   ├── mcp-app/                    # React MCP App (plan card, approval card, verification card, scorecard)
-│   ├── companion/                  # React companion web app
-│   └── simulator/                  # React Alexa+ simulator host (emulator agent, voice, device modes)
+│   ├── mcp-app/                    # React MCP App bundle (plan card, approval card, verification card, scorecard)
+│   └── web/                        # one React app: companion pages + the Alexa+ simulator route (emulator agent, voice, device modes)
 ├── infra/cdk/                      # AWS CDK (TypeScript): AgentCore, Cognito, Bedrock access, scheduler, RDS
 ├── scenarios/                      # YAML scenarios (the demo evening, test fixtures)
 ├── constitutions/                  # example constitutions incl. the demo household
@@ -212,7 +218,7 @@ No AWS account is required for the local path. `HAVEN_LLM=off` runs every flow d
 
 ## How this is built
 
-Haven is built by one engineer working with AI coding assistants. The design decisions are the human's: the thesis, the four innovations, the decision pipeline and its precedence, the fail-closed posture, the choice to keep the risk engine free of ML and the constitution non-Turing-complete, the twin-first adapter strategy, and every rejected alternative in `docs/adr/`. The assistants implement downstream of those decisions under the standing rules in [`CLAUDE.md`](./CLAUDE.md): surface assumptions, ask before deciding, no speculative complexity, verify every feature by running it.
+Haven is built by one engineer working with AI coding assistants. The design decisions are the human's: the thesis, the four things Haven adds, the decision pipeline and its precedence, the fail-closed posture, the choice to keep the risk engine free of ML and the constitution non-Turing-complete, the twin-first adapter strategy, and every rejected alternative in `docs/adr/`. The assistants implement downstream of those decisions under the standing rules in [`CLAUDE.md`](./CLAUDE.md): surface assumptions, ask before deciding, no speculative complexity, verify every feature by running it.
 
 Nothing in this README is asserted on a model's say-so. Where something is simulated it is labeled as a twin in the UI and in the docs. Where something is unproven or unprotected, `THREAT_MODEL.md` says so.
 

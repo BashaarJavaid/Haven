@@ -7,7 +7,7 @@
 **Reasoning:**
 
 - The author owns no Alexa device, EV, wearable, or smart-home hardware, and the product must demonstrate every capability end to end. Mocks would be dismissed; a labeled, reproducible, physically plausible twin is a product feature (onboarding preview, what-if planning, safe testing of a new constitution).
-- Real data where it is free keeps the twin grounded: ComEd prices and Open-Meteo weather are live; Home Assistant's demo integration provides real device semantics; Smartcar's sandbox and Ring's sandbox exercise the real API code paths.
+- Real data where it is free keeps the twin grounded: ComEd prices and Open-Meteo weather are live; Home Assistant's demo integration provides the real API over simulated devices (labeled `real API, demo devices`, never `real`); one physical energy-monitoring smart plug on HA's local integration is the living-room light, so a mixed real/twin household is a demonstrated configuration and verify-after-act runs against a measured power draw; Smartcar's sandbox and Ring's sandbox exercise the real API code paths.
 - The same interface means buying a smart plug later is a configuration change, and a mixed real/twin household is a first-class configuration.
 - Honest labeling converts a weakness into credibility with judges and, later, with customers.
 

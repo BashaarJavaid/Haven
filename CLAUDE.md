@@ -37,10 +37,11 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 - **Every state change goes through the pipeline** and produces an audit row. There is no admin path, script, or test helper that executes an action without a `Decision`.
 - **Fail closed** for anything whose failure would weaken a guarantee (Postgres, audit write, boundary evaluation, risk exception). If unsure whether something fails open or closed, it's closed. `ARCHITECTURE.md` §9.
 - **Twin is labeled.** Every observation carries `source: real | twin`; UI and tool outputs show it. Never present twin data as real.
+- **Roles bind to linked accounts, never to voices.** Alexa gives add-ons no speaker identity, so an Echo is a shared device. `security.*` classes are never approvable by voice (approval is in the companion app under a passkey; the validator rejects `alexa` in their `ask_channels`), claimed identity and any speaker hint only lower authority, and Haven never does its own speaker or face recognition. See `ARCHITECTURE.md` §7 and `docs/constitution.md` §2.5.
 - **Every tool output has `speakable`** with ≤ 5 options and no internal IDs or JSON in consumer strings; every tool stays under the latency budget (`ARCHITECTURE.md` §8) by never calling a model, a solver, or a third-party network inside the call.
 - **Real API contracts, verbatim.** Alexa+ (MCP 2025-11-25, Streamable HTTP, OAuth 2.1 PKCE S256, PRM), AgentCore (Runtime `/mcp` on 8000, CUSTOM_JWT, Gateway policy session header, Cedar/Dogwood quotas), Ring (HMAC-SHA256 webhooks), ComEd, Open-Meteo. When a doc is unclear, fetch it and cite it in the ADR or the code comment; don't guess an API shape.
 - **Secrets** only in `.env` (local) or AgentCore Identity (AWS). Never in the graph, the constitution, audit payloads, tests, or docs.
-- **AWS spend is bounded.** Pay-per-use services only; RDS and Runtime are deployed for the judging window and destroyed after. Don't add an always-on AWS resource without asking.
+- **AWS spend is bounded.** Pay-per-use services plus exactly two always-on ones, RDS and the worker service (ADR-008, approved 2026-09-16), all deployed for the judging window and destroyed after. Don't add another always-on AWS resource without asking.
 - **`THREAT_MODEL.md` rows move only when earned.** A row becomes "Yes" when the item that earns it is built and its `verify:` check passes. Claims never outrun code.
 - Relative dates in docs are absolute (`2026-10-23`), never "next week".
 - **Friction log, from day one.** Devpost gives up to a 10 percent bonus for it, so it is the cheapest score in the project. Anyone, human or agent, appends an entry to `docs/friction-log.md` at the moment a third-party tool, API, SDK, doc, or CLI did not do what its docs said, cost more than about 15 minutes, or forced a workaround. Log it then, not at the end of the session, because sessions end without warning. At the end of any task that touched a third-party tool, check whether an entry was earned and add it if missed. Entries are facts from the session with the doc URL and the exact error text; never invented, never padded. Severity: `Blocker`, `Major`, `Minor`.
@@ -56,10 +57,10 @@ Target state; each phase adds its commands here as they become real.
 - `uv run haven decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
 - `uv run haven scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
 - `uv run haven verify-audit` / `uv run haven audit export --range ...` — audit chain.
-- `uv run haven constitution validate|compile|analyze|activate constitutions/quinn-home.yaml`.
+- `uv run haven constitution validate|compile|analyze|activate constitutions/quinn-home.yaml` (`analyze` runs AgentCore Policy's automated reasoning and needs AWS credentials; locally it reports "not analyzed").
 - `uv run pytest` — tests; `uv run pytest tests/latency` — budget; `uv run pytest tests/cedar_conformance` — both engines.
 - `uv run ruff check . && uv run ruff format --check . && uv run mypy haven/`.
-- `pnpm -r lint && pnpm -r typecheck && pnpm -r test`; `pnpm --filter simulator dev`, `pnpm --filter companion dev`, `pnpm --filter mcp-app build`.
+- `pnpm -r lint && pnpm -r typecheck && pnpm -r test`; `pnpm --filter web dev` (companion pages + simulator route), `pnpm --filter mcp-app build`.
 - `cd infra/cdk && pnpm cdk deploy` / `pnpm cdk destroy` — the AWS stack for the judging window.
 - `HAVEN_LLM=off|bedrock`, `HAVEN_ADAPTERS=devices:ha,ev:twin,energy:real,...` — runtime configuration.
 
