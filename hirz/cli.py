@@ -12,6 +12,7 @@ from uuid import UUID
 import httpx
 import sqlalchemy as sa
 
+from hirz.constitution.cli import constitution_command
 from hirz.db import connect_database, require_current
 from hirz.graph.context import ContextService
 from hirz.graph.models import SCOPES, GraphError, utc
@@ -143,7 +144,20 @@ def main() -> int:
     context.add_argument("--scope", choices=SCOPES, default="all")
     context.add_argument("--member", type=UUID)
     context.add_argument("--as-of", type=aware_timestamp)
+    constitution = commands.add_parser(
+        "constitution", help="Validate, compile, or preview rules without a database"
+    )
+    operations = constitution.add_subparsers(dest="operation", required=True)
+    for operation in ("validate", "compile"):
+        command = operations.add_parser(operation)
+        command.add_argument("file", type=Path)
+        command.add_argument("--gateway-resource", default="hirz-local")
+    preview = operations.add_parser("preview")
+    preview.add_argument("old", type=Path)
+    preview.add_argument("new", type=Path)
     args = parser.parse_args()
+    if args.command == "constitution":
+        return asyncio.run(constitution_command(args))
     if args.command == "context" and (args.scope == "member") != (
         args.member is not None
     ):

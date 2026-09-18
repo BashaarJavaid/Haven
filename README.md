@@ -268,6 +268,7 @@ From the repository root:
 ```bash
 uv sync --locked
 pnpm install --frozen-lockfile
+# First build/export the pinned Dogwood CLI (docs/development.md, item 7).
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .

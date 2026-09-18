@@ -7,11 +7,11 @@ The constitution is the document that answers "how much authority does Hirz have
 ## 1. Principles
 
 1. **Three modes, no fourth.** Every action class, for every role, resolves to exactly one of `auto`, `ask`, `never`. There is no "auto but notify" mode; notification is a separate, always-on property of the audit trail.
-2. **Tighten only.** A constitution can make Hirz more cautious than the risk floor, never less. `auto` on a CRITICAL class is rejected at validation, not silently ignored.
+2. **Tighten only.** A constitution can make Hirz more cautious than the risk floor, never less. `auto` on a HIGH or CRITICAL class is rejected at validation, not silently ignored.
 3. **Explicit beats implicit.** An action class with no rule resolves to `ask` for adults and `never` for everyone else. Silence is not consent.
 4. **Readable by the household.** Every rule round-trips to a plain-English sentence the companion app shows next to it. If the engine can't render a rule as a sentence, the rule is invalid.
 5. **Analyzable.** The compiled Cedar set is validated against the tool schema everywhere. In AWS mode it is also analyzed by AgentCore Policy's automated reasoning on create or update; a policy that always permits, or a condition that can never be satisfied, fails activation with an explanation. No local library performs that analysis, so local activation runs the structural checks only and says so.
-6. **Voice never approves security.** An Echo is a shared device and Alexa does not tell add-ons who spoke, so a role cannot be enforced by voice. Every `security.*` rule in `ask` mode must route its approval to a per-person channel (`app_push`, passkey-gated); a constitution that lists `alexa` as an ask channel for a security class fails validation. See §2.5.
+6. **Voice never approves security.** An Echo is a shared device and Alexa does not tell add-ons who spoke, so a role cannot be enforced by voice. Every `security.*` rule, including `never`, must route any approval to a per-person channel (`app_push`, passkey-gated); a constitution that lists `alexa` as an ask channel for a security class fails validation. See §2.5.
 
 ---
 
@@ -83,6 +83,7 @@ autonomy:
       max_minutes: 120
     access_code_share:
       mode: never
+      ask_channels: [app_push]
     arm_disarm:
       mode: ask
       ask_channels: [app_push]
@@ -142,19 +143,30 @@ The closed list lives in `hirz/risk/classes.yaml` and is the same list the risk 
 
 ### 2.2 Modes and precedence within a rule
 
-For a given class and requester:
+For a given class and requester, select the base rule (or adult-derived `ask` /
+other-role `never` default). Apply inherited role/domain restrictions, then each
+role's explicit-class entry before its wildcard. Role entries may only tighten;
+they never bypass base conditions, hard bounds, `allowed_requesters`, `never_for`,
+or a stricter applicable override. The first matching override wins; its mode
+must be at least as restrictive as the base mode. An unresolved earlier override
+prevents authorization rather than assuming a later branch applies.
 
-1. `per_role[role][class]` if present, else `per_role[role]["*"]` if present.
-2. Otherwise `autonomy[domain][class]` with its `overrides` evaluated top to bottom; the first `when` that is satisfied wins; otherwise the base `mode`.
-3. Otherwise `defaults.unlisted_class` for `adult`-derived roles, `never` for everyone else.
+The documented owner/caregiver → adult inheritance is retained; restricted roles
+cannot inherit adult authority. Caregiver requests outside `limited_to` are
+`never`, including unlisted actions. Parent restrictions remain effective.
 
-A `per_role` entry may only tighten (`auto → ask → never`); a `per_role` that would loosen fails validation. The same rule applies to `overrides`: an override's `mode` must be at least as restrictive as the rule's base `mode`, so `mode: ask` with an override to `auto` fails validation. Overrides exist to ask or refuse in specific situations, never to grant.
+Approval TTL is an integer from 1 through 1440 minutes, with a rule's optional
+`approval_ttl_minutes` overriding the default. Omitted quorum is `any_adult`;
+omitted `allowed_requesters` permits roles whose effective rule is not `never`.
+Quorum participants derived from `adult` must be permitted in that domain;
+`all_adults` satisfaction is a future pipeline-supplied fact, not established here.
 
 ### 2.3 Conditions grammar
 
 ```
 condition  := expr
-expr       := term (("and" | "or") term)*
+expr       := conjunction ("or" conjunction)*
+conjunction := term ("and" term)*
 term       := "not" term | comparison | predicate | "(" expr ")"
 comparison := attr op literal | attr "in" "[" literal ("," literal)* "]"
 predicate  := attr "is set" | attr "is not set" | fn "(" args ")"
@@ -166,13 +178,45 @@ literal    := number | string | boolean | time
 
 Available attribute roots: `context` (hour, weekday, is_quiet_hours, price_band), `occupancy` (present members, sleeping_any, sleeping_in(zone)), `action` (class, target, params), `requester` (role, member_id, claimed_role, surface), `asset` (the target asset's policy and state), `risk` (band, factors), `household` (budget_used_today).
 
-Semantics: deterministic, side-effect-free, evaluated against one immutable context snapshot. Any reference to an attribute absent from the snapshot makes the *entire* condition not-satisfied before any `not`/`and`/`or` runs, and emits a `POLICY_ERROR` audit row naming the attribute. This is the same rule the author's PortunusMCP ABAC evaluator uses and for the same reason: a naive `False` at the leaf inverts under `not`.
+Semantics: deterministic, side-effect-free, evaluated against one immutable context snapshot. Any reference to an attribute absent from the snapshot makes the *entire* condition not-satisfied before any `not`/`and`/`or` runs, and returns a `POLICY_ERROR` diagnostic naming only sorted attribute paths. Later pipeline/audit work persists it. This is the same rule the author's PortunusMCP ABAC evaluator uses and for the same reason: a naive `False` at the leaf inverts under `not`.
+
+`is not set` means an explicitly present null; absence remains an error. Known-false
+ordinary auto conditions escalate to `ask` and can be authorized by approval.
+Unresolved conditions and override tests cannot be authorized by approval.
+`requester.surface` and `context.time` (household-local HH:MM, quoted or bare) are
+available in the closed typed registry in `hirz/constitution/conditions.py`.
+Numbers use exact Decimal comparisons, at most four fractional digits and Cedar's
+signed fixed-point range. YAML parsing retains decimal text before validation;
+invalid numeric facts fail closed, never round. See [AgentCore numeric limits](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy-limitations-section.html).
+
+`occupancy.present(member_id)` checks member presence;
+`occupancy.sleeping_in(zone_id)` checks the **exact** zone;
+`schedule.expected_within(member_id, minutes)` checks an expected arrival from
+snapshot time through the future horizon, inclusive. The snapshot's member and
+zone identifiers are household-scoped. Missing occupancy/schedule collections are
+unknown; explicitly empty collections mean nobody present, sleeping, or expected.
+Optional `action.target.zone` and `context.unexpected_visitor` are supplied facts.
+The `unexpected_visitor` veto exists only when the household writes `never_for`.
 
 Not in the grammar, on purpose: loops, recursion, user functions, string manipulation, arithmetic beyond literal comparison, and any way to reference another rule.
 
 ### 2.4 Budgets and bounds
 
-`budget` is a hard daily cap enforced at pipeline stage 6 from `household.budget_used_today` (computed from the audit ledger). Reaching the cap turns `auto` into `ask` for the rest of the day; exceeding it by an in-flight action is `DENY_BUDGET`. `bounds` are numeric guards the risk engine also reads (`outside_bounds` factor). Physical safety clamps (`ARCHITECTURE.md` §10) are code and sit above any bound the constitution sets.
+`budget` is a hard daily cap enforced at pipeline stage 6 from
+`household.budget_used_today` (computed from the audit ledger). Reaching the cap
+turns `auto` into `ask`; an action crossing it is `DENY_BUDGET`, including after
+approval. Item 7 validates and renders this configuration; item 9 enforces it.
+
+Bounds are hard authorization limits, including after approval: `min_f/max_f`
+compare `action.params.target_f`, `ev_soc_floor` compares the same-named parameter,
+`max_open_minutes` compares `action.params.open_minutes`, and `max_minutes`
+compares `action.params.minutes`. Missing/invalid hard-guard facts return `never`
+and `POLICY_ERROR`. Physical safety clamps remain separate, above these bounds.
+
+Quiet-hour days identify the interval's **start day** in household local time.
+Intervals include their start, exclude their end, and carry across midnight.
+Affected `auto` actions escalate to `ask`. This is validated/rendered here and
+awaits item 9 enforcement; preview does not pretend to enforce it.
 
 A household can also **pause** Hirz (`ARCHITECTURE.md` §5.14): while paused, every `auto` resolves as `ask`. Pause is a mode on the household, not a constitution version; it only tightens, so a voice may set it, and only the app clears it.
 
@@ -248,17 +292,28 @@ permit (
 )
 when temporal {
   formerly within 30m AgentCore::Action::"HirzActions___governance_approve_action"::response {
-    eventResource:            resource,
+    callerResource:           resource,
+    callerPrincipal:          principal,
     input.household:          context.input.household,
     input.action_class:       context.input.action_class,
     input.action_hash:        context.input.action_hash,
+    input.session_id:         context.input.session_id,
+    input.ttl_minutes:        30,
     output.ttl_minutes:       30,
     output.approved:          true
   }
 };
 ```
 
-The snippet shows intent; the exact field-matching syntax, and whether five matched fields fit the engine's per-policy operator limit, is settled at the `ROADMAP.md` item 7 gate. If it does not fit, household and class move into the hash's preimage check in the Lambda, which already recomputes it.
+The snippet omits the generated ordinary `when` guard for brevity. The complete
+compiler additionally restricts household, actual action/class agreement, and the
+current TTL group, excludes governance approval from temporal authorization, and
+emits current-condition/hard-bound forbids. The native gate verifies the CLI's
+`callerResource` field spelling and all correlations above within one temporal
+operator. The AgentCore service-schema spelling/comparison remains item 37;
+no AWS conformance is claimed locally. Compilation checks the [temporal quotas](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy-temporal.html):
+25 policies, three operators per policy, and a 24-hour maximum window. No matching
+field was dropped in favor of a future signer.
 
 Four properties this permit must have, each with a test (`ARCHITECTURE.md` §12):
 
@@ -269,7 +324,7 @@ Four properties this permit must have, each with a test (`ARCHITECTURE.md` §12)
 
 What this permit does **not** establish is that a person approved. The `approve_action` call reaches the Gateway through the worker, so a fully compromised worker could claim an approval that never happened. `ROADMAP.md` item 38d closes that for `security.*` classes by verifying the member's passkey assertion, over the action hash, inside the Lambda ([ADR-010](./adr/ADR-010-passkey-verified-approvals.md)); until it is built, `THREAT_MODEL.md` says No.
 
-*Who* may approve *what* is enforced on the stateless permit for `approve_action` itself: one `permit` per `ask` class on `HirzActions___governance_approve_action` with `context.input.action_class == "..."`, the rule's TTL group (`context.input.ttl_minutes == 30`), the rule's `allowed_requesters` as a condition on `requester_role`, and its quorum inputs. An approval that was not permitted is recorded as an `error` event, and the generic temporal permit matches only `response` events, so it can never be satisfied by a refused approval. `never` classes carry a `forbid`, which wins over the generic permit.
+*Who* may approve *what* is enforced on the stateless permit for `approve_action` itself: one `permit` per approvable class (including auto classes with known-false conditions) on `HirzActions___governance_approve_action` with `context.input.action_class == "..."`, the rule's TTL group (`context.input.ttl_minutes == 30`), the rule's `allowed_requesters` as a condition on `requester_role`, and its quorum inputs. An approval that was not permitted is recorded as an `error` event, and the generic temporal permit matches only `response` events, so it can never be satisfied by a refused approval. `never` classes carry a `forbid`, which wins over the generic permit.
 
 Compilation facts the engine relies on:
 
@@ -277,7 +332,7 @@ Compilation facts the engine relies on:
 - **What the boundary is independent about.** The Gateway sees only the request: the action, the resource, and the input fields. Action class, parameter bounds (`target_f` within 66–76), the action hash (recomputed by the Lambda), and the order of approval and action are therefore evaluated independently of Hirz. The requester's role is not: it is an input Hirz supplies, like the context facts. Occupancy, sleeping, quiet-hours, and other context facts are not in the request; the Executor passes them as input fields (`zone_sleeping`, `is_quiet_hours`) computed from the same context snapshot the pipeline used, and the snapshot hash is included in the call so the audit row can prove both engines saw the same facts. The boundary catches a compiler bug, a pipeline bug, or a bypass path; it does not catch a wrong snapshot. `THREAT_MODEL.md` says the same.
 - **A permit is what gets a command signed.** For devices in the home, the Gateway target does not call the device. On a permit, the `hirz-actions` Lambda signs the command with a KMS key only its role can use, and the home-side agent (Hirz Link) executes only commands whose signature verifies ([ADR-009](./adr/ADR-009-signed-commands-home-agent.md)). Hirz's own processes hold no credential that can act on a device, so a path that skips the boundary has nothing to act with. The command is addressed to one home (`home_id`), executed at most once, and for a bounded operation carries its own ending, which the home runs from its own clock (`ARCHITECTURE.md` §5.6).
 - Temporal rules require the policy session header on every Gateway call; the Executor uses the plan session id. Quotas (25 temporal policies per engine, 3 operators per policy, 24-hour window) are still checked at compile time and fail activation with the count if exceeded.
-- **One evaluator locally, and it is Dogwood's.** Every Cedar policy is a valid Dogwood policy, so the identical policy text is evaluated locally by the open-source Dogwood CLI (`validate`, `replay`, `lower`, `check-parse`) behind a thin subprocess wrapper, fed the compiled set plus the session's event trace. Hirz does not reimplement temporal semantics. `tests/cedar_conformance` asserts Dogwood and AgentCore Policy produce the same decision for every scenario action. Locally the evaluator runs in the same container as the pipeline, so it is a **second evaluator in the same trust domain**, not a boundary outside Hirz; the audit row's `boundary.engine` reads `dogwood-local` and the Cedar view says so. Only AWS mode has the out-of-process boundary. If the CLI turns out not to be drivable this way (`ROADMAP.md` item 7 verifies it early), the fallback is `cedarpy` for stateless rules plus an in-process record for the single generic temporal rule, and the docs are updated to say so.
+- **One evaluator locally, and it is Dogwood's.** Every Cedar policy is a valid Dogwood policy, so the identical policy text is evaluated locally by the open-source Dogwood CLI (`validate`, `replay`, `lower`, `check-parse`) behind a thin subprocess wrapper, fed the compiled set plus the session's event trace. Hirz does not reimplement temporal semantics. `tests/cedar_conformance` currently compares the pure evaluator and native Dogwood; AgentCore comparison over scenario actions remains item 37. Locally the evaluator runs in the same container as the pipeline, so it is a **second evaluator in the same trust domain**, not a boundary outside Hirz; the audit row's `boundary.engine` reads `dogwood-local` and the Cedar view says so. Only AWS mode has the out-of-process boundary. If the CLI turns out not to be drivable this way (`ROADMAP.md` item 7 verifies it early), the fallback is `cedarpy` for stateless rules plus an in-process record for the single generic temporal rule, and the docs are updated to say so.
 - Changing temporal policies invalidates open policy sessions on the engine (HTTP 409 on reuse). Activation therefore starts a new plan session and re-issues pending approvals under it.
 
 ---
@@ -302,7 +357,7 @@ Activation is refused while any `ask` for a class whose rule is changing has a p
 | Situation | Resolution | Why |
 |---|---|---|
 | Malik (owner) asks to pre-warm the living room to 72 at 17:35; nobody asleep | `auto` → EXECUTE | `energy.hvac_adjust` auto, bounds met, condition met, band LOW |
-| Same, at 23:40, Mom asleep in the guest room adjacent zone | `ask` → ASK | override `when occupancy.sleeping_in(zone)` → ask; risk factor `occupant_asleep` also raises to HIGH → ASK |
+| Same, at 23:40, Mom asleep in the living room target zone | `ask` → ASK | exact-zone override → ask; dynamic risk evaluation remains item 8 |
 | Teen asks Alexa to unlock the front door | `never` → DENY_CONSTITUTION | `per_role.teen.security.door_unlock: never` |
 | Malik asks to unlock the door for "the plumber" not on the schedule, under version 7 (no `never_for`) | `ask` → ASK on the phone | The household has not written a veto; a security class still asks, and never by voice |
 | The same request after Malik activates version 8 with `never_for: [unexpected_visitor]` | DENY_CONSTITUTION, citing version 8 | The household wrote the veto; it holds regardless of the requester. Same lock, different outcome, because the family changed the rule |
@@ -311,5 +366,60 @@ Activation is refused while any `ask` for a class whose rule is changing has a p
 | Someone at the kitchen Echo answers "yes" to "Unlock the front door?" | Not an approval; Alexa says the request is waiting on Malik's phone | `security.*` excludes `alexa` from `ask_channels` (§2.5); a voice cannot be attributed to a person |
 | A constitution lists `ask_channels: [alexa]` on `security.door_unlock` | Validation refused | Voice never approves security (principle 6) |
 | Mom: "Malik called from a strange number and needs five hundred dollars. Is it really him?" | `finance.verify_request` `auto` → assessment lands CRITICAL → VERIFY; Malik answers in his own app | Hirz has no way to move money, by design, and no money action is offered to the orchestrator; a money request is assessed, not executed. `finance.transfer_money` stays `never` with a CRITICAL floor so the scam-pattern factor has a class to attach to |
-| Today's autonomous energy actions have already spent $9.60 of the daily budget and the next battery dispatch would spend $0.80 | `ask` → ASK_BUDGET | budget `usd_per_day: 10` nearly consumed (the budget caps spend, not savings) |
-| Constitution says `auto` for `access_code_share` | Activation refused | CRITICAL classes cannot be `auto` (tighten-only vs. the risk floor) |
+| Today's autonomous energy actions have already spent $9.60 of the daily budget and the next `energy.optimize_cost` action would spend $0.80 | `DENY_BUDGET` at stage 6 (item 9; not enforced by item 7) | budget `usd_per_day: 10` nearly consumed (the budget caps spend, not savings) |
+| Constitution says `auto` for `access_code_share` | Activation refused | HIGH and CRITICAL classes cannot be `auto` (static validation) |
+
+
+### 6.1 What the worked examples verify in item 7
+
+The table above describes the eventual pipeline. Item 7's runnable assertions are
+in `tests/unit/test_constitution.py` and `tests/cedar_conformance/test_local.py`:
+
+| Worked example | Item 7 assertion | Checks still owed |
+|---|---|---|
+| Owner pre-warms within bounds, nobody asleep | `auto`; native permit without approval | Runtime risk, execution, audit, read-back |
+| Someone asleep in target zone | `ask`; approval needed; adjacent sleeping zone alone does not match | Dynamic risk factors, notification |
+| Teen unlock | `never`, even with an approval trace | Linked-account identity and pipeline denial row |
+| Unexpected visitor under v7 | `ask`, phone channel | Visitor-context assembly, phone authentication |
+| Unexpected visitor under v8 | `never`, even after prior approval | Activation, production visitor events, audit |
+| Expected arrival and stranger inside its window | Same phone `ask`; no identification inferred | Passkey approval, signed action, relock, read-back |
+| Voice answers yes to security | Approval with `alexa` denied by native policy | MCP interaction and authenticated channels |
+| Security policy lists Alexa | Schema validation refuses it, even for `never` | Activation workflow |
+| Suspicious money request | Verify-request class `auto`; transfer-money class `never` | Protect assessment, dynamic risk, contact response, VERIFY |
+| $9.60 spent + $0.80 proposed under $10 cap | Cap validated/rendered on optimize-cost; evaluator still reports constitution mode | Item 9 must produce DENY_BUDGET, not ASK_BUDGET |
+| Auto access-code-share | Schema validation refuses static CRITICAL `auto` | Runtime floor/pipeline |
+
+### 7. Local engine contract
+
+`load(Path)` accepts a standalone constitution or the second document of the seed
+envelope, rejects duplicate keys, and does not read/write the database.
+`resolve(validated_constitution, Action, PolicyFacts)` is pure. `PolicyFacts` owns
+an immutable deep snapshot, household, aware `as_of`, and household-scoped member/
+zone identifiers. It is explicitly supplied; graph-to-policy assembly is item 9.
+`RuleOutcome` includes version, class rule, effective mode, conditions status,
+approval requirements, bounds/budget configuration, and value-free diagnostics.
+There is no `Decision`, audit event, approval authentication or activation here.
+
+The compiler derives actions from `hirz/risk/classes.yaml`, input fields from the
+typed attribute registry, and predicate fact declarations from parsed conditions.
+Its optional flat values plus `nulls` distinguish absence/invalid facts from null.
+Role and class conditions use the same required canonical boundary fields as
+authorization, with no shadow copies.
+Predicate fields encode only occupancy/schedule observations, never rule outcomes;
+Cedar independently evaluates the Boolean conditions, roles, guards and history.
+As elsewhere in local mode, these facts are supplied by Hirz and are not proof of
+the world. Ordinary condition preflight applies even to a branch Boolean evaluation
+would skip. Each native approval request is checked before its response enters
+history. Response facts do not prove a human, a passkey, hash recomputation, or
+single use. Error/timeout/malformed output is a boundary denial, with no fallback.
+
+English rendering covers the complete schema deterministically; YAML dump/reload
+preserves semantics. There is no English parser. Preview returns every changed
+situation and unchanged situations for affected classes without UI truncation;
+consumer lines are separate from structured diagnostics and pending configuration.
+For home v7 → v8, the three consumer lines are exactly the README's expected lines.
+Budgets, quiet hours, verification and learning configuration are clearly marked
+as awaiting later-stage enforcement.
+
+Commands, native setup, package/container behavior, and stored-seed recovery are
+in [development procedures](./development.md#local-constitution-workflows-item-7).

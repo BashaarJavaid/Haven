@@ -157,3 +157,153 @@ isolated built wheel. Whole-view refresh serialization and unpartitioned
 observation history retain their approved limits. All threat-model rows remain
 unchanged. The local database remains migrated and seeded, and the development
 stack remains running. Friction-log review found no new entry to add.
+
+## Item 7 — Complete (2026-09-18)
+
+Implemented and verified locally on macOS ARM64, Python **3.12.13**, uv
+**0.12.15**, Rust **1.98.1**, Hypothesis **6.168.0**, Docker Engine **29.7.2**,
+and the existing local PostgreSQL 16 service. This is **local evidence**; no new
+GitHub Actions run or AWS comparison is claimed. The approved semantics and
+rejected alternatives are recorded in [ADR-003](./adr/ADR-003-constitution-yaml-to-cedar.md#item-7-amendment--2026-09-18-author-approved-semantics)
+and [ADR-004](./adr/ADR-004-no-ml-risk-scoring.md#item-7-catalog-amendment--2026-09-18-author-approved).
+
+### Engine setup and gate
+
+Fetched upstream into `/private/tmp/hirz-item7-dogwood`, checked out
+`996d756de1013b7ae209a14f566a80375a59f2f0`, installed Rust into task-specific
+temporary directories without changing shell setup, and ran
+`cargo build --release -p dogwood-cli`. The revision has no upstream Cargo.lock;
+the generated lock is retained in `scripts/dogwood.Cargo.lock`. A subsequent
+`cargo build --locked --release -p dogwood-cli` passed. Native binary reports
+`dogwood 1.0.0`; an ignored local copy is at `.tools/dogwood`.
+
+The **complete** home policy passed native `validate` with
+`passed: true`, `passed_without_warnings: true`, `errors: []`, `warnings: []`.
+Parents' full constitution also validated. Native `check-parse` reports **52
+policies**, **one temporal policy**, and **one temporal operator**; all resource,
+principal, household, class, hash, session and TTL correlations fit that operator.
+Matching fields use the native default event schema, including `callerResource`.
+The compiled manifest checks 25 temporal policies and a maximum 1440-minute window.
+
+| Gate trace | Actual result |
+|---|---|
+| Permitted approval request + approved response, then matching unlock | Permit |
+| Same unlock without an approval | Deny |
+| Approval for another class, same hash | Deny |
+| Ten-minute approval presented to a thirty-minute permit | Deny |
+| Household A approval presented for household B | Deny |
+
+The suite also checks two genuine TTL groups and two combined household policy
+sets, expiry (including permit at exactly 1800 seconds and deny at 1801), rejected
+approvals, wrong hashes/resources/principals/sessions, requester/approver/channel/
+quorum restrictions, current vetoes and hard bounds after earlier approval, actual
+action/class disagreement, governance-action exclusion, and malformed/failed/
+timed-out subprocesses. Approval requests are authorized before response events
+enter the local replay; the supplied facts do not authenticate a human or passkey.
+Unknown action names are escaped and cannot inject trace syntax.
+
+### Final runnable checks
+
+For native checks `HIRZ_DOGWOOD` pointed at the built pinned binary. The tool
+sandbox required escalation for loopback/socket and Docker access; no application
+credentials were printed and no persistent household rows were changed.
+
+| Command/check | Observed result |
+|---|---|
+| `uv run pytest` | **182 passed, 11 deselected**, **93.44%** coverage (1813 statements, 119 missed), 80% gate passed; **50.54 s** |
+| `uv run pytest -m integration --no-cov` | **11 passed, 177 deselected** at that run, **5.69 s**; corrected seeds exercised in uniquely named disposable databases, then removed |
+| `uv run pytest tests/cedar_conformance -k property --no-cov --hypothesis-show-statistics` | **3 passed, 33 deselected**, **27.10 s**; each property reports **200 passing, 0 failing, 0 invalid**, stopped at `settings.max_examples=200` |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 66 files already formatted |
+| `uv run mypy hirz/ scripts/ alembic/` | Success; 30 source files |
+| `uv build` | sdist and `hirz-0.0.0-py3-none-any.whl` built |
+| Isolated wheel installation in `/private/tmp/hirz-item7-wheel`, cwd `/private/tmp` | Both packaged YAML resources load: 21 classes and 21 situation groups; installed CLI validates home with the native binary |
+| `docker build --tag hirz-item7:check .` | Passed; pinned Rust builder and dependency lock, native binary copied into existing Python image |
+| Container with read-only fixture mount | UID **10001**, Cargo absent, both YAML catalogs load; native full-policy validation, matching-approval permit and no-approval deny passed |
+| Final rebuilt container smoke | UID 10001, Dogwood present, Cargo absent, both catalogs packaged |
+| `git diff --check` | No whitespace errors |
+
+The three deterministic properties cover bounds/missing/null facts and every role,
+condition precedence/ordered overrides and Boolean preflight, and approval traces.
+There are **600** generated examples per full property run, all using the native
+Dogwood evaluator; this is not a mock engine comparison. Direct cases additionally
+cover schedule endpoints, exact-zone occupancy, scoped IDs, membership/time
+compilation, all catalog roles/situations, both seeds, schema refusals, immutable
+facts, exact YAML decimal text, renderer/YAML round trips, CLI exits, and structured
+diagnostics. Worked-example assertions versus downstream work are mapped in
+[the constitution spec](./constitution.md#61-what-the-worked-examples-verify-in-item-7).
+
+### CLI output and preview
+
+Ran the actual user workflows (JSON stdout; all exit 0):
+
+```text
+uv run hirz constitution validate constitutions/quinn-home.yaml
+  valid: true; version: 7; engine: dogwood-local; analysis: not analyzed: local mode
+uv run hirz constitution compile constitutions/quinn-home.yaml
+  valid: true; policy + schema + manifest; 21 catalog actions; one TTL group (30)
+uv run hirz constitution preview constitutions/quinn-home.yaml /private/tmp/hirz-item7-v8.yaml
+  Unexpected visitor: ask on phone → never
+  Expected arrival: still asks on your phone
+  Hirz does not identify the visitor
+```
+
+The temporary v8 is a standalone serialization of home v7 with version 8 and
+`never_for: [unexpected_visitor]` on door unlock; it was not activated or stored.
+Preview also returns changed diagnostic situations and relevant unchanged
+situations without UI truncation. The existing stored seeds were inspected in an
+explicit `SET TRANSACTION READ ONLY` transaction, then rolled back:
+
+| Stored version | Status | Existing stored hash | Validation result |
+|---|---|---|---|
+| Home v7 | unvalidated | `e422d43213ce9e97e3150867eb5e48807e5e54f0b1d6bb5fe51d96e3d1cc94c6` | `security.access_code_share: security approval channels must exclude alexa, including never rules` |
+| Parents v1 | unvalidated | `d2de39f61464a053eee02ef3973e9d0baef941a042730e147d18d743fa82540d` | Same explicit validation error |
+
+No reseeding, reset, migration, or stored hash rewrite was used to make those old
+versions validate. Only the repository seed files' security channels changed.
+
+### Failures corrected and practical limits
+
+Early compiler checks rejected integer-form decimal strings such as `decimal("76")`;
+Cedar requires digits on both sides of the decimal point. Early trace serialization
+also used Cedar extension syntax, yielding `type error: expected decimal, got
+string`; native traces require plain decimal literals. Both implementation errors
+were corrected and covered by actual native replay. The first container attempt
+excluded the new Cargo lock via `.dockerignore`; adding only that lock to the
+allowlist fixed the build. Sandbox GitHub lookup/escalation and the missing
+upstream lockfile are recorded in [friction entries 8–9](./friction-log.md).
+Earlier successful checkpoints were 109 targeted tests, then 177 full-suite tests
+at 92.19%, then 181 at 93.33%; the final expanded suite result is above.
+
+The CLI is usable; no cedarpy fallback or upstream Python-binding change was
+needed. The local wrapper replays prefixes for its small approval history rather
+than implementing temporal semantics itself. This is a same-process-trust-domain
+local evaluator, not an external AWS boundary. `cedar-conform` now requires native
+engine/compiler tests and fails for missing tooling; that workflow has not been
+run remotely during this task. AgentCore event-schema integration/comparison and
+automated reasoning remain item 37. Runtime risk, budgets/quiet hours, graph fact
+assembly, activation, authenticated approval/redemption, hash recomputation,
+signed audit, device actions and relock are **not** claimed here. All corresponding
+threat-model protections remain planned.
+
+### Final review rerun — 2026-09-18
+
+Review found and corrected two implementation issues before handoff: the English
+label formatter was replacing decimal points in numeric bounds (`0.3` became
+`0 3`), and role/class condition references had redundant boundary fields alongside
+the canonical requester role/action class. Numeric rendering now preserves the
+value; conditions directly use the same canonical fields as authorization, so
+shadow copies cannot disagree. Regression assertions cover both. The first
+renderer rerun passed **182 tests**, **93.44%** coverage, **51.25 s**.
+
+After the canonical-field correction, the final command was
+`uv run pytest --hypothesis-show-statistics`: **183 passed, 11 deselected**,
+**93.40%** coverage (1817 statements, 120 missed), **48.99 s**. Each of the three
+native properties again reported **200 passing, 0 failing, 0 invalid** cases.
+Ruff passed, formatting checked 66 files, strict mypy passed over 30 source files,
+and instruction parity/workflow structure checks passed. The final wheel and
+container were rebuilt: installed-wheel compilation outside the checkout and
+container UID 10001/native validation/approval permit/no-approval deny all passed,
+with explicit checks for numeric English, canonical fields, packaged catalogs,
+and absence of Cargo. This supersedes the earlier checkpoint totals above; graph
+integration and the preserved stored-seed observations are unchanged.

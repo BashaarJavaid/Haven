@@ -8,6 +8,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 1 item 7: validated constitution engine, canonical Action,
+  deterministic English/situation preview, native Dogwood compiler and local
+  boundary, and database-free `constitution validate|compile|preview` commands.
+  Required local conformance replaces the CI placeholder; the pinned binary ships
+  in the non-root container. Corrected seed files preserve existing stored history.
+  Semantics: [ADR-003](./docs/adr/ADR-003-constitution-yaml-to-cedar.md#item-7-amendment--2026-09-18-author-approved-semantics);
+  validation and limits: [item 7 evidence](./docs/verification-log.md#item-7--complete-2026-09-18).
+
 - 2026-09-18: Phase 1 item 6: versioned Household Graph, household-scoped repositories,
   redacted current/historical context, and explicit two-household demo bootstrap
   with `hirz seed` / `hirz context`. Constitutions remain unvalidated; the bootstrap

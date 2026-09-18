@@ -90,3 +90,44 @@ Whole-view refresh and graph writers serialize globally. This is the approved
 small-graph implementation; neither the 20 ms context budget nor production write
 throughput is claimed by item 6. Observation partitioning, real adapter ingestion,
 policy activation, auth, and signed audit behavior remain later items.
+
+## Local constitution workflows (item 7)
+
+Install Rust 1.98.1 with Cargo and a native linker (Apple command-line tools on
+macOS; the normal build toolchain on Linux). The build uses the pinned upstream
+revision and checked-in dependency lock, needs network access, and writes only a
+local binary. No Python bindings or daemon are required.
+
+```sh
+uv sync --locked
+uv run python scripts/build_dogwood.py
+export HIRZ_DOGWOOD="$PWD/.tools/dogwood"
+uv run hirz constitution validate constitutions/quinn-home.yaml
+uv run hirz constitution compile constitutions/quinn-home.yaml --gateway-resource hirz-local
+uv run hirz constitution preview constitutions/quinn-home.yaml /path/to/proposed-v8.yaml
+uv run pytest
+```
+
+Alternatively put the pinned `dogwood` binary on `PATH`. A missing binary fails
+validation/tests; it does not select another engine. The default Gateway resource
+is `hirz-local`. Validate/compile output JSON with English, local engine findings,
+and `not analyzed: local mode`; compile also includes policy text, action schema,
+and a manifest. Preview accepts two complete documents (standalone or seed
+envelopes), not an English patch. Diagnostics go to stderr and failures exit
+nonzero. None of these commands requires `.env`, a database, credentials or AWS.
+Local engine checks do not establish AWS conformance or authenticate approvals.
+
+The container's Rust build stage checks out the same source revision and uses
+`scripts/dogwood.Cargo.lock`. Only its native binary reaches the final Python
+image; Cargo stays in the builder, and runtime UID remains 10001. Python wheels
+carry the class catalog and situation corpus. CI requires native local checks in
+`cedar-conform`; AWS comparison remains item 37.
+
+**Existing seed history is preserved.** The files now explicitly give
+`security.access_code_share` the `app_push` channel. Old stored seeds inherit
+Alexa, so validating them reports `security.access_code_share: security approval
+channels must exclude alexa, including never rules`. Their rows, hashes and
+`unvalidated` status are not rewritten. Do not reset a household, rerun seeding to
+force a change, or edit the stored YAML/hash: the later activation workflow owns
+new stored constitution versions. Corrected files can seed a fresh disposable
+household for tests. Bootstrap remains the explicit item 6 exception.

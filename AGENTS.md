@@ -76,8 +76,9 @@ When closing an item: append the evidence entry first, then the one-sentence roa
 Available after Phase 0 items 1–3: dependency installs, Python and TypeScript
 tests, lint/type checks, `uv build`, and the local Compose stack with explicit
 initialization and service checks, Alembic migrations, and the local doctor.
-Item 6 also supplies explicit demo seeding and redacted context reads. The other
-commands below remain target state.
+Item 6 also supplies explicit demo seeding and redacted context reads. Item 7 adds
+read-only constitution validation, compilation, and preview; native Dogwood setup
+is in `docs/development.md`. The other commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -95,8 +96,10 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 - `uv run hirz verify-audit` (`--anchors` also checks the S3 anchors in AWS mode) / `uv run hirz audit export --range ...` — audit chain.
 - `docker compose -f compose.link.yml up -d` — Hirz Link beside Home Assistant, in the home (AWS mode).
 - `uv run python scripts/backtest.py` — the year-long rate-plan backtest every published savings figure comes from.
-- `uv run hirz constitution validate|compile|analyze|activate constitutions/quinn-home.yaml` (`analyze` runs AgentCore Policy's automated reasoning and needs AWS credentials; locally it reports "not analyzed").
-- `uv run pytest` — service-free tests (80% coverage gate); `uv run pytest -m integration --no-cov` — live PostgreSQL tests in uniquely named disposable databases; `uv run pytest tests/latency` — budget; `uv run pytest tests/cedar_conformance` — both engines.
+- `uv run python scripts/build_dogwood.py` — build the pinned native CLI (Rust/Cargo required); `export HIRZ_DOGWOOD="$PWD/.tools/dogwood"` enables local checks.
+- `uv run hirz constitution validate|compile constitutions/quinn-home.yaml [--gateway-resource hirz-local]` — database-free JSON output, native policy validation; reports `not analyzed: local mode`.
+- `uv run hirz constitution preview OLD NEW` — deterministic situation differences; no activation. `analyze`/`activate` remain later work.
+- `uv run pytest` — service-free tests (80% coverage gate); `uv run pytest -m integration --no-cov` — live PostgreSQL tests in uniquely named disposable databases; `uv run pytest tests/latency` — budget; `uv run pytest tests/cedar_conformance` — YAML/native Dogwood agreement; AWS comparison remains item 37.
 - `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/ scripts/ alembic/`.
 - The add-on conformance checker (separate open-source repository, name to be chosen) run against the local MCP server.
 - `pnpm -r lint && pnpm -r typecheck && pnpm -r test`; `pnpm --filter web dev` (companion pages + simulator route), `pnpm --filter mcp-app build`.
@@ -105,7 +108,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 and Phase 1 item 6 are complete and verified; item 7 (constitution engine) is next.** The graph has versioned reads, a materialized current context, and two explicit demo seeds. Seeded constitutions remain unvalidated: no decision pipeline, policy enforcement, signed audit writer, or device actions exist. Evidence is in `docs/verification-log.md`; graph procedures are in `docs/development.md`. CI's five placeholder jobs still prove nothing; item 5's second-person run remains author-reported.
+**Phase 0 and Phase 1 items 6–7 are complete and verified locally; item 8 (risk engine) is next.** The constitution engine, read-only CLI, native Dogwood compiler/boundary and derived preview pass local checks. Stored seed versions remain unvalidated and preserve their old hashes; no runtime pipeline, activation, authenticated approval, signed audit or device actions exist. Evidence: `docs/verification-log.md`; setup: `docs/development.md`. AWS comparison remains item 37; four CI jobs remain placeholders.
 
 ---
 

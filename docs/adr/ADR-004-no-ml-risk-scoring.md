@@ -18,3 +18,13 @@
 - *Learned per-household risk.* Rejected for v1; the consent-gated memory path can later propose per-household tightening, never loosening.
 
 **Consequences:** Adding an action class is a code change with a risk profile, a Cedar action, a tool mapping, and a test. Bands are compared in exactly one function.
+
+## Item 7 catalog amendment — 2026-09-18 (author-approved)
+
+The closed catalog now lives in [`hirz/risk/classes.yaml`](../../hirz/risk/classes.yaml).
+It preserves the fourteen documented profiles and adds the seven approved classes:
+`energy.optimize_cost`, `environment.comfort_profile`, `environment.shades`,
+`security.arm_disarm`, `health.comfort_preferences`, `health.medical_decisions`, and
+`communication.contact_trusted_contact`. The catalog is the single source for
+static validation and compiler action names. Item 7 enforces HIGH/CRITICAL
+no-auto validation; dynamic factors and runtime risk scoring remain item 8.

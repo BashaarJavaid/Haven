@@ -112,6 +112,7 @@ autonomy:
       mode: auto
   security:
     access_code_share:
+      ask_channels: [app_push]
       mode: never
     arm_disarm:
       ask_channels:
