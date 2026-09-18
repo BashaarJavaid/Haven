@@ -53,13 +53,17 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 
 ## Commands
 
-Available after Phase 0 item 1: dependency installs, Python and TypeScript smoke
-tests, lint/type checks, and `uv build`. The other commands below remain target
-state. The verified toolchain and scaffold setup are in `README.md`; use Node 24.
+Available after Phase 0 items 1–2: dependency installs, Python and TypeScript
+tests, lint/type checks, `uv build`, and the local Compose stack with explicit
+initialization and service checks. The other commands below remain target state.
+The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
 - `uv sync --locked` / `pnpm install --frozen-lockfile` — reproduce locked dependencies; `uv build` — build the Python sdist and wheel.
-- `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Hirz.
+- `uv run python scripts/init_dev.py` — initialize local credentials and HA demo onboarding; preserves existing state.
+- `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Hirz liveness server.
+- `uv run python scripts/check_dev.py` — authenticated database/HA checks and `/health`; `--observability` also checks a disposable trace after starting the optional Jaeger profile.
+- `docker compose -f compose.dev.yml --profile observability down` — stop services, preserving named volumes; README documents recovery and the separate destructive reset.
 - `uv run alembic upgrade head` — migrations.
 - `uv run hirz doctor` — local diagnostics (Postgres, HA, signing key, migrations, constitution compiles); `--aws` adds PRM, `401`, Runtime tool call, Gateway policy decision, scheduler tick.
 - `uv run hirz decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
@@ -69,7 +73,7 @@ state. The verified toolchain and scaffold setup are in `README.md`; use Node 24
 - `uv run python scripts/backtest.py` — the year-long rate-plan backtest every published savings figure comes from.
 - `uv run hirz constitution validate|compile|analyze|activate constitutions/quinn-home.yaml` (`analyze` runs AgentCore Policy's automated reasoning and needs AWS credentials; locally it reports "not analyzed").
 - `uv run pytest` — tests; `uv run pytest tests/latency` — budget; `uv run pytest tests/cedar_conformance` — both engines.
-- `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/`.
+- `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/ scripts/`.
 - The add-on conformance checker (separate open-source repository, name to be chosen) run against the local MCP server.
 - `pnpm -r lint && pnpm -r typecheck && pnpm -r test`; `pnpm --filter web dev` (companion pages + simulator route), `pnpm --filter mcp-app build`.
 - `cd infra/cdk && pnpm cdk deploy` / `pnpm cdk destroy` — the AWS stack for the judging window.
@@ -77,7 +81,7 @@ state. The verified toolchain and scaffold setup are in `README.md`; use Node 24
 
 ## Current phase
 
-**Phase 0 item 1 is complete and verified (2026-09-17); item 2 is next.** The Python package and both TypeScript workspaces have import smoke tests, lint/type checks, and locked dependencies. No application behavior is built. The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. A second, external critique was worked through the same day (authorization chain, visitor and scam semantics, async conversation honesty, local relock, fair backtest, derived rule preview, pause, ADR-010); it has its own `CHANGELOG.md` entry. Continue with `ROADMAP.md` items 2–5. Do not pull forward Phase 1 work while scaffolding.
+**Phase 0 items 1–2 are complete and verified (2026-09-17); item 3 is next.** The Python package and both TypeScript workspaces have tests, lint/type checks, and locked dependencies. The localhost-only Compose stack has Postgres 16, HA demo devices with automated token provisioning, a Hirz `/health` endpoint, and optional Jaeger. Python: 19 passed; authenticated HA curl returned 123 entities; isolated credential-failure, restart-persistence, and Jaeger checks passed on macOS ARM64 with Docker Desktop 4.87.0. Runtime coverage is 100% over five statements, not an application guarantee. No household application behavior, MCP, worker, migrations, or Hirz CLI is built. The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. A second, external critique was worked through the same day (authorization chain, visitor and scam semantics, async conversation honesty, local relock, fair backtest, derived rule preview, pause, ADR-010); it has its own `CHANGELOG.md` entry. Continue with `ROADMAP.md` items 3–5. Do not pull forward Phase 1 work while scaffolding.
 
 ---
 

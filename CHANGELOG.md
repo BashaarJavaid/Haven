@@ -8,6 +8,19 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-17: Phase 0 item 2 verified: localhost-only Compose with pinned
+  PostgreSQL 16.15, Home Assistant 2026.9.2 demo entities, a non-root Hirz
+  `/health` container, and optional Jaeger 2.21.0. Explicit initialization
+  provisions local passwords and an HA token into ignored `.env`; reruns reuse
+  credentials and inconsistent state fails without resetting data. Added live
+  checks, recovery/reset instructions, and bootstrap tests. Python: 19 passed;
+  Ruff, strict mypy, locked sync, and package build passed. Authenticated HA curl
+  returned 123 entities; isolated checks proved credential failure handling,
+  database/HA persistence across down/up, and disposable Jaeger trace retrieval.
+  Runtime coverage is 100% over five statements, not a household guarantee.
+  Verified on macOS ARM64 with Docker Desktop 4.87.0; upstream HA does not support
+  Docker Desktop for its general Container installation. No physical-device
+  support, MCP, worker, application schema, or readiness endpoint is claimed.
 - 2026-09-17: Phase 0 item 1 verified: installable Python 3.12 `hirz` package,
   uv lockfile, private pnpm `web` and `mcp-app` workspaces, exact dependency pins,
   shared TypeScript/ESLint configuration, Ruff, strict mypy, and import smoke tests.
