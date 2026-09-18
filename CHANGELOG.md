@@ -8,14 +8,17 @@ All notable changes are documented here. The format follows
 
 ### Added
 
-- 2026-09-17: Phase 0 item 4 implemented, pending green CI on `main`: all
+- 2026-09-17: Phase 0 item 4 complete and verified on `main`: all
   eleven GitHub Actions jobs, pinned tools/actions, read-only repository access,
   existing Python/TypeScript checks, disposable Compose integration checks,
   package/fresh-wheel and non-root container checks. Future scenario, conformance,
   latency, Cedar, and release jobs are explicit successful placeholders; browser
   tests and frontend bundles are also deferred. No AWS publication or new
-  application guarantees. The author merges the items 1–4 PR before main
-  verification and a follow-up completion-documentation PR.
+  application guarantees. After PR #1 merged, all eleven jobs passed in
+  [main run 35310102678](https://github.com/BashaarJavaid/Hirz/actions/runs/35310102678)
+  at `fdc06fca4499794b55a84ffcae6e8203654b2a9b`. Python 36 passed with 86.13%
+  coverage, PostgreSQL integration 4 passed, and one Vitest test per workspace
+  passed on Ubuntu 24.04 x64. Item 5's second-person README check remains pending.
   Local verification: Python 36 passed, 86.13% coverage; PostgreSQL integration
   4 passed; one Vitest test per workspace; lint/types, package/fresh-wheel,
   isolated Compose service checks, schema drift, doctor, and container UID passed.

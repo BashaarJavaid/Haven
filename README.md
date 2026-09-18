@@ -300,9 +300,11 @@ explicit deferral messages in their logs and job summaries. Browser tests and
 frontend bundles are also deferred. No AWS secrets or publication are involved.
 There are no cross-run dependency/Docker caches or artifact uploads.
 
-On GitHub, open **Actions → CI → Run workflow** for manual dispatch after the
-workflow reaches `main`. Item 4 remains pending until a green `main` run is
-verified; green placeholders do not claim application behavior or protection.
+On GitHub, open **Actions → CI → Run workflow** for manual dispatch.
+Phase 0 item 4 is complete (2026-09-17): all eleven jobs passed in the
+[main run](https://github.com/BashaarJavaid/Hirz/actions/runs/35310102678).
+Green placeholders do not claim application behavior or protection. Item 5
+still requires a second person to follow the README on a clean machine.
 
 ## Local development stack (Phase 0, items 2–3)
 

@@ -670,7 +670,8 @@ are explicit successful placeholders. Their logs and job summaries name the
 deferred work; TypeScript tests and build also disclose absent browser tests
 and frontend bundles. The release placeholder runs on every event and publishes
 nothing. Green scaffold CI does not establish any of these future guarantees.
-Item 4 remains pending until a green run on `main` is verified.
+Phase 0 item 4 is verified (2026-09-17): all eleven jobs passed in
+[main run 35310102678](https://github.com/BashaarJavaid/Hirz/actions/runs/35310102678).
 
 The complete target remains:
 
