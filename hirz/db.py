@@ -1,4 +1,4 @@
-"""Phase 0 schema and local async connections; no repositories or audit writer."""
+"""SQLAlchemy Core schema and local async connections; no audit writer."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -106,6 +106,194 @@ audit_pointer = sa.Table(
 )
 
 
+# Graph identities stay stable; mutable attributes have current and archived versions.
+households.append_column(sa.Column("rate_plan", sa.Text))
+households.append_column(sa.Column("constitution_version", sa.Integer))
+households.append_constraint(
+    sa.CheckConstraint(
+        "rate_plan IS NULL OR rate_plan IN ('comed_time_of_day', 'comed_hourly', 'twin')",
+        name="households_rate_plan_allowed",
+    )
+)
+
+
+def graph_table(name: str, references: dict[str, str]) -> sa.Table:
+    table = sa.Table(
+        name,
+        metadata,
+        sa.Column(
+            "household_id", sa.UUID, sa.ForeignKey("households.id"), primary_key=True
+        ),
+        sa.Column("id", sa.UUID, primary_key=True),
+    )
+    required = {
+        "contact_channels": {"contact_id"},
+        "asset_bindings": {"asset_id"},
+        "asset_policies": {"asset_id"},
+        "schedule_events": {"schedule_id"},
+        "preferences": {"member_id"},
+    }
+    for column, target in references.items():
+        table.append_column(
+            sa.Column(column, sa.UUID, nullable=column not in required.get(name, set()))
+        )
+        table.append_constraint(
+            sa.ForeignKeyConstraint(
+                ["household_id", column],
+                [f"{target}.household_id", f"{target}.id"],
+            )
+        )
+    return table
+
+
+trusted_contacts = graph_table("trusted_contacts", {"member_id": "members"})
+contact_channels = graph_table("contact_channels", {"contact_id": "trusted_contacts"})
+assets = graph_table("assets", {"owner_member_id": "members"})
+asset_bindings = graph_table("asset_bindings", {"asset_id": "assets"})
+asset_policies = graph_table("asset_policies", {"asset_id": "assets"})
+schedules = graph_table("schedules", {"member_id": "members"})
+schedule_events = graph_table(
+    "schedule_events",
+    {
+        "schedule_id": "schedules",
+        "member_id": "members",
+        "zone_id": "assets",
+    },
+)
+routines = graph_table("routines", {"member_id": "members"})
+preferences = graph_table("preferences", {"member_id": "members"})
+observations = graph_table(
+    "observations", {"member_id": "members", "asset_id": "assets"}
+)
+observations.append_constraint(
+    sa.CheckConstraint(
+        "member_id IS NULL OR asset_id IS NULL",
+        name="observations_one_subject",
+    )
+)
+for name, table, columns, condition in (
+    (
+        "observations_member_unique",
+        observations,
+        ["household_id", "member_id"],
+        "member_id IS NOT NULL",
+    ),
+    (
+        "observations_asset_unique",
+        observations,
+        ["household_id", "asset_id"],
+        "asset_id IS NOT NULL",
+    ),
+    (
+        "observations_household_unique",
+        observations,
+        ["household_id"],
+        "member_id IS NULL AND asset_id IS NULL",
+    ),
+):
+    sa.Index(
+        name,
+        *(table.c[c] for c in columns),
+        unique=True,
+        postgresql_where=sa.text(condition),
+    )
+for table in (asset_bindings, asset_policies):
+    table.append_constraint(sa.UniqueConstraint("household_id", "asset_id"))
+
+GRAPH_TABLES = {
+    table.name: table
+    for table in (
+        households,
+        members,
+        member_accounts,
+        trusted_contacts,
+        contact_channels,
+        assets,
+        asset_bindings,
+        asset_policies,
+        schedules,
+        schedule_events,
+        routines,
+        preferences,
+        observations,
+    )
+}
+HISTORY_TABLES: dict[str, sa.Table] = {}
+for table in GRAPH_TABLES.values():
+    table.append_column(
+        sa.Column(
+            "attributes", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+        )
+    )
+    table.append_column(
+        sa.Column(
+            "valid_from",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        )
+    )
+    table.append_column(sa.Column("valid_to", sa.DateTime(timezone=True)))
+    table.append_constraint(
+        sa.CheckConstraint("valid_to IS NULL", name=f"{table.name}_current_open")
+    )
+    table.append_constraint(
+        sa.CheckConstraint(
+            "jsonb_typeof(attributes) = 'object'",
+            name=f"{table.name}_attributes_object",
+        )
+    )
+    history_name = (
+        "observation_history" if table is observations else table.name + "_history"
+    )
+    history = sa.Table(
+        history_name,
+        metadata,
+        *(
+            sa.Column(
+                column.name,
+                column.type,
+                primary_key=column.primary_key or column.name == "valid_from",
+                nullable=False if column.name == "valid_to" else column.nullable,
+            )
+            for column in table.columns
+        ),
+        sa.CheckConstraint("valid_to > valid_from", name=f"{history_name}_interval"),
+    )
+    HISTORY_TABLES[table.name] = history
+
+constitution_versions = sa.Table(
+    "constitution_versions",
+    metadata,
+    sa.Column(
+        "household_id", sa.UUID, sa.ForeignKey("households.id"), primary_key=True
+    ),
+    sa.Column("version", sa.Integer, primary_key=True),
+    sa.Column("yaml", sa.Text, nullable=False),
+    sa.Column("hash", sa.Text, nullable=False),
+    sa.Column("status", sa.Text, nullable=False, server_default="unvalidated"),
+    sa.Column("compiled_cedar", sa.Text),
+    sa.Column("analysis_report", JSONB),
+    sa.Column("activated_at", sa.DateTime(timezone=True)),
+    sa.CheckConstraint("version > 0", name="constitution_version_positive"),
+    sa.CheckConstraint("hash ~ '^[0-9a-f]{64}$'", name="constitution_hash_hex"),
+    sa.CheckConstraint(
+        "status = 'unvalidated' AND compiled_cedar IS NULL AND activated_at IS NULL",
+        name="constitution_unvalidated_only",
+    ),
+)
+households.append_constraint(
+    sa.ForeignKeyConstraint(
+        ["id", "constitution_version"],
+        ["constitution_versions.household_id", "constitution_versions.version"],
+        name="households_constitution_version_fk",
+        use_alter=True,
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+
+
 def database_url(values: dict[str, str]) -> sa.URL:
     password = values.get("POSTGRES_PASSWORD")
     if not password:
@@ -147,6 +335,8 @@ def require_current(connection: sa.Connection) -> None:
         len(heads) != 1
         or set(current) != set(heads)
         or not metadata.tables.keys() <= tables
+        or "household_context"
+        not in sa.inspect(connection).get_materialized_view_names()
     ):
         raise LocalError(
             "Migrations are missing, inconsistent, or behind; "

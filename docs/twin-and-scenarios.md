@@ -71,6 +71,13 @@ A scenario can inject an inbound-call event with a presented number and a transc
 
 ## 3. Scenario DSL
 
+The item 6 seed files use two YAML documents (graph, then unvalidated constitution).
+They bind every initial asset to `twin` and contain no observations; a scenario
+must supply its `initial` state and adapter overrides when item 16 implements the
+runner. The seeded arrival window is schedule context only and never evidence of
+visitor identity. Loader details are in [development procedures](./development.md).
+
+
 Two scenarios carry the demo. They are separate files on purpose: a scenario describes one household, and the DSL is not extended to span two.
 
 **`scenarios/parents-scam-check.yaml`** (the cold open, Mom and Dad's home):

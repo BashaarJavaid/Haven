@@ -1,0 +1,276 @@
+# Synthetic demo bootstrap. Graph first; unvalidated constitution second.
+household:
+  slug: quinn-home
+  name: Malik's home
+  timezone: America/Chicago
+  locale: en-US
+  rate_plan: comed_time_of_day
+  location:
+    latitude: 41.88
+    longitude: -87.63
+    source: twin
+members:
+- id: malik
+  display_name: Malik
+  role: owner
+- id: mom
+  display_name: Mom
+  role: adult
+- id: dad
+  display_name: Dad
+  role: adult
+member_accounts:
+- provider: demo
+  sub: malik
+  member_id: malik
+- provider: demo
+  sub: mom
+  member_id: mom
+- provider: demo
+  sub: dad
+  member_id: dad
+schedules:
+- id: expected_arrivals
+  name: Expected arrivals
+schedule_events:
+- id: mom_arrival
+  schedule_id: expected_arrivals
+  member_id: mom
+  zone_id: hvac.guest_room
+  kind: arrival
+  starts_at: '2026-10-13T18:45:00-05:00'
+  ends_at: '2026-10-13T19:15:00-05:00'
+  expected_at: '2026-10-13T19:00:00-05:00'
+preferences:
+- id: mom_temperature
+  member_id: mom
+  scope: member
+  key: temperature_target_f
+  value: 72
+  source: declared
+  confidence: 1.0
+assets:
+- id: ev
+  name: Car
+  kind: ev
+  owner_member_id: malik
+  physical:
+    capacity_kwh: 75
+    charger_kw: 7.4
+    efficiency: 0.92
+- id: home_battery
+  name: Home battery
+  kind: home_battery
+  physical:
+    capacity_kwh: 13.5
+    power_kw: 5
+    efficiency: 0.9
+    reserve_soc: 0.1
+- id: solar
+  name: Solar
+  kind: solar
+  physical:
+    kw_peak: 6
+- id: dishwasher
+  name: Dishwasher
+  kind: appliance
+  physical:
+    cycle_minutes: 105
+    cycle_kwh: 1.2
+- id: hvac.living_room
+  name: Living room
+  kind: hvac_zone
+- id: hvac.guest_room
+  name: Guest room
+  kind: hvac_zone
+- id: light.living_room
+  name: Living room light
+  kind: light
+- id: lock.front_door
+  name: Front door lock
+  kind: lock
+- id: doorbell.front_door
+  name: Front doorbell
+  kind: doorbell
+asset_bindings:
+- id: ev
+  asset_id: ev
+  adapter: twin
+  entity_id: ev
+- id: home_battery
+  asset_id: home_battery
+  adapter: twin
+  entity_id: home_battery
+- id: solar
+  asset_id: solar
+  adapter: twin
+  entity_id: solar
+- id: dishwasher
+  asset_id: dishwasher
+  adapter: twin
+  entity_id: dishwasher
+- id: hvac.living_room
+  asset_id: hvac.living_room
+  adapter: twin
+  entity_id: hvac.living_room
+- id: hvac.guest_room
+  asset_id: hvac.guest_room
+  adapter: twin
+  entity_id: hvac.guest_room
+- id: light.living_room
+  asset_id: light.living_room
+  adapter: twin
+  entity_id: light.living_room
+- id: lock.front_door
+  asset_id: lock.front_door
+  adapter: twin
+  entity_id: lock.front_door
+- id: doorbell.front_door
+  asset_id: doorbell.front_door
+  adapter: twin
+  entity_id: doorbell.front_door
+---
+autonomy:
+  communication:
+    contact_emergency_services:
+      mode: ask
+      quorum: any_adult
+    contact_trusted_contact:
+      mode: auto
+    notify_member:
+      mode: auto
+  energy:
+    appliance_start:
+      conditions:
+      - context.hour >= 7 and context.hour < 22
+      mode: auto
+      overrides:
+      - mode: ask
+        when: context.hour >= 22 or context.hour < 7
+    battery_dispatch:
+      mode: auto
+    ev_charge:
+      conditions:
+      - asset.policy.needed_by is set
+      mode: auto
+    hvac_adjust:
+      bounds:
+        max_f: 76
+        min_f: 66
+      conditions:
+      - not occupancy.sleeping_in(action.target.zone)
+      mode: auto
+      overrides:
+      - mode: ask
+        when: occupancy.sleeping_in(action.target.zone)
+    optimize_cost:
+      bounds:
+        ev_soc_floor: 0.3
+      budget:
+        usd_per_day: 10
+      mode: auto
+  environment:
+    comfort_profile:
+      mode: auto
+    lights:
+      mode: auto
+    shades:
+      mode: auto
+  finance:
+    change_payee:
+      mode: never
+    transfer_money:
+      mode: never
+    verify_request:
+      mode: auto
+  health:
+    comfort_preferences:
+      mode: auto
+    medical_decisions:
+      mode: never
+    routine_reminders:
+      mode: auto
+  security:
+    access_code_share:
+      mode: never
+    arm_disarm:
+      ask_channels:
+      - app_push
+      mode: ask
+    camera_disable:
+      ask_channels:
+      - app_push
+      max_minutes: 120
+      mode: ask
+      quorum: owner
+    door_unlock:
+      allowed_requesters:
+      - owner
+      - adult
+      ask_channels:
+      - app_push
+      max_open_minutes: 10
+      mode: ask
+      quorum: any_adult
+defaults:
+  approval_ttl_minutes: 30
+  ask_channels:
+  - alexa
+  - app_push
+  unlisted_class: ask
+household: quinn-home
+learning:
+  accept_memory_proposals: manual
+per_role:
+  child:
+    '*':
+      mode: never
+  guest:
+    '*':
+      mode: never
+    environment.lights:
+      mode: auto
+  teen:
+    energy.hvac_adjust:
+      mode: ask
+    security.door_unlock:
+      mode: never
+  unknown:
+    '*':
+      mode: never
+quiet_hours:
+- affects:
+  - appliance_start
+  - lights
+  days:
+  - mon
+  - tue
+  - wed
+  - thu
+  - sun
+  from: '22:30'
+  to: 06:30
+roles:
+  adult: {}
+  caregiver:
+    inherits: adult
+    limited_to:
+    - environment
+    - health
+    - communication
+  child: {}
+  guest: {}
+  owner:
+    inherits: adult
+  teen: {}
+  unknown: {}
+verification:
+  require_requester_confirmation:
+  - security.door_unlock
+  - security.camera_disable
+  trusted_contact_methods_order:
+  - app_confirmation
+  - verified_callback
+  - safe_word
+  - verified_email
+version: 7

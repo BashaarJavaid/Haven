@@ -55,7 +55,7 @@ When closing an item: append the evidence entry first, then the one-sentence roa
 - **No ML risk scoring.** The risk table and factors are the deliberate design (ADR-004), not a gap to fill.
 - **The constitution grammar is non-Turing-complete.** No loops, functions, recursion, arithmetic beyond literal comparison. Don't "helpfully" extend it.
 - **One canonical shape per object.** `Action`, `Decision`, `Plan`, `AuditEvent`, `VerificationCase` are defined once in `ARCHITECTURE.md` §4 and `hirz/pipeline/models.py`. Don't invent a new response shape for a new endpoint or tool.
-- **Every state change goes through the pipeline** and produces an audit row. There is no admin path, script, or test helper that executes an action without a `Decision`.
+- **Every state change goes through the pipeline** and produces an audit row. There is no admin path, script, or test helper that executes an action without a `Decision`. **Approved item 6 bootstrap exception (2026-09-18):** initial synthetic data for the two demo households and repository tests may write graph rows before items 9–10; this never authorizes a device action, policy activation, runtime mutation surface, or fabricated audit event (ADR-002).
 - **Fail closed** for anything whose failure would weaken a guarantee (Postgres, audit write, boundary evaluation, risk exception). If unsure whether something fails open or closed, it's closed. `ARCHITECTURE.md` §9.
 - **Twin is labeled.** Every observation carries `source: real | real API, demo devices | twin`; tool outputs and detail views show it. Cards show two states, `live` and `simulated` (anything not plainly `real` shows as simulated). A published rate table is `real (published ComEd rate)`, never "live". Never present twin data as real. Hosted-demo households bind `twin` adapters only. Falling back from a real device to its twin is a scenario and demo feature: in a real household an unreachable device is `unavailable; actual state unknown`, and a twin read-back never verifies a real device.
 - **No Hirz process outside the home holds a device credential in AWS mode.** The Home Assistant token stays with Hirz Link in the house; the home obeys only commands signed by the KMS key that only the `hirz-actions` Lambda role may use; write-capable cloud credentials are readable by that role only. A change that hands the worker or the `mcp` role something it can act with is wrong (ADR-009). Local mode has no outside boundary and is labeled `dogwood-local`. The claim covers bugs and bypass paths, not a compromised worker (`THREAT_MODEL.md`; ADR-010 and item 38d narrow that for `security.*`). The signer recomputes the action hash and never trusts the worker's; a command names one home and runs once; and Link owns the ending of a bounded operation, so a relock never depends on the cloud. Hirz governs the actions Hirz takes: never write that it controls everything Alexa can do.
@@ -75,7 +75,9 @@ When closing an item: append the evidence entry first, then the one-sentence roa
 
 Available after Phase 0 items 1–3: dependency installs, Python and TypeScript
 tests, lint/type checks, `uv build`, and the local Compose stack with explicit
-initialization and service checks, Alembic migrations, and the local doctor. The other commands below remain target state.
+initialization and service checks, Alembic migrations, and the local doctor.
+Item 6 also supplies explicit demo seeding and redacted context reads. The other
+commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -84,8 +86,10 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 - `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Hirz liveness server.
 - `uv run python scripts/check_dev.py` — authenticated database/HA checks and `/health`; `--observability` also checks a disposable trace after starting the optional Jaeger profile.
 - `docker compose -f compose.dev.yml --profile observability down` — stop services, preserving named volumes; README documents recovery and the separate destructive reset.
-- `uv run alembic upgrade head` — explicit local migrations; never applied at startup. `downgrade base` destroys the five foundation tables and is for disposable data only.
-- `uv run hirz doctor` — four read-only local checks: Postgres, HA demo entities, P-256 signing probe, migration head/table presence. Exit 0 only if all pass; no `--aws` or constitution check yet. Those checks remain target state.
+- `uv run alembic upgrade head` — explicit local migrations; never applied at startup. `downgrade base` destroys the application tables and graph history and is for disposable data only.
+- `uv run hirz seed constitutions/quinn-home.yaml constitutions/quinn-parents.yaml` — explicit synthetic bootstrap; unchanged seeds are no-ops, evolved households are refused.
+- `uv run hirz context <household-uuid> --scope all` — redacted graph reads; `--scope member --member <uuid>` and timezone-aware `--as-of` are supported. Procedures in `docs/development.md`.
+- `uv run hirz doctor` — four read-only local checks: Postgres, HA demo entities, P-256 signing probe, migration head/table/materialized-view presence. Exit 0 only if all pass; no `--aws` or constitution check yet. Those checks remain target state.
 - `uv run hirz decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
 - `uv run hirz scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
 - `uv run hirz verify-audit` (`--anchors` also checks the S3 anchors in AWS mode) / `uv run hirz audit export --range ...` — audit chain.
@@ -101,7 +105,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 is complete and verified (items 1–4 on 2026-09-17, item 5 on 2026-09-18); Phase 1 item 6 is next.** Scaffold only: package, Compose stack, five foundation tables, `hirz doctor`, and CI with five labeled placeholder jobs; no household application behavior exists, and green placeholders prove nothing. Evidence per item is in `docs/verification-log.md`; the design revisions of 2026-09-17 (two critiques) are summarized in `CHANGELOG.md`. Item 5's second-person run was reported by the author, not captured in the repo.
+**Phase 0 and Phase 1 item 6 are complete and verified; item 7 (constitution engine) is next.** The graph has versioned reads, a materialized current context, and two explicit demo seeds. Seeded constitutions remain unvalidated: no decision pipeline, policy enforcement, signed audit writer, or device actions exist. Evidence is in `docs/verification-log.md`; graph procedures are in `docs/development.md`. CI's five placeholder jobs still prove nothing; item 5's second-person run remains author-reported.
 
 ---
 

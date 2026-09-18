@@ -33,3 +33,50 @@ and exports must be household-scoped. Audit execution remains item 10. Graph
 history columns, repositories, and seeds remain item 6; this migration does not
 claim historical graph reads. Migrations are explicitly invoked and have a
 reversible, destructive downgrade tested only against disposable databases.
+
+## Item 6 amendment — 2026-09-18 (author-approved)
+
+The graph uses current tables under stable identity keys plus matching history
+tables, with UTC half-open `valid_from`/`valid_to` intervals. Separate identity
+and version tables were rejected because the foundation already supplies the
+foreign keys. History describes what was recorded then, not retroactive effective
+time: backdated household changes are refused, expected `valid_from` tokens
+prevent lost updates, unchanged writes are no-ops, and changed versions of one
+entity cannot share an instant. Deletion/tombstones and bitemporal corrections
+were explicitly deferred. Existing rows begin history at migration time; unknown
+rate plans and location remain unknown rather than invented.
+
+Current context reads use `household_context`; historical reads reconstruct from
+current/history tables in one query. Materializing every historical snapshot was
+rejected to avoid duplicated snapshots and repeated history rebuilds. Writers
+serialize before mutation and refresh once in the same transaction. A plain
+refresh was chosen over concurrent refresh for this small graph; it replaces the
+whole view and can block readers ([PostgreSQL 16 refresh contract](https://www.postgresql.org/docs/16/sql-refreshmaterializedview.html)).
+The global lock and refresh are a documented ceiling, not a claim of scaled
+throughput. Daily observation-history partitions are deferred until ingestion
+volume warrants their maintenance, rather than adding a partition scheduler now.
+
+Item 6 has an explicit **synthetic bootstrap exception** before the pipeline and
+signed audit writer exist. The local seed command initializes only `quinn-home`
+and `quinn-parents`, with `demo` account links and twin asset bindings; repository
+writes are otherwise exercised only in tests. No device action, policy activation,
+runtime mutation endpoint, or fabricated audit event is authorized by this
+exception. Existing/evolved households are never reset. Constitution versions
+are persisted unvalidated, with no compiled policy or activation timestamp;
+item 7 owns semantic validation. Multi-document YAML preserves the constitution's
+specified top-level shape; nested wrappers and separate graph files were rejected.
+
+The complete graph entity set is implemented now, including `shade` to reconcile
+§5.1 with the existing device/context specs. Five graph-backed context scopes ship;
+planner/constraint/security summaries, passkeys, adapters, and rule evaluation
+remain with their owning items. Public snapshots exclude account subjects,
+channel values/hashes, and safe-word hashes at the SQL projection; private reads
+stay in explicitly household-scoped repositories. Only availability failures may
+serve a process-local cached current snapshot, with an explicit read-only opt-in
+and stale labeling. Historical reads and decision callers fail closed.
+
+The approved synthetic contents and loader contract are documented in
+[the constitution spec](../constitution.md#21-action-classes) and
+[development procedures](../development.md). They grant Malik no membership or
+login in his parents' home. The decisions in this amendment supersede only the
+corresponding graph target-state details; threat-model rows remain unearned.

@@ -242,15 +242,21 @@ The typed model everything reasons over. Stored in Postgres as tables plus JSONB
 | `Household` | name, timezone, locale, address (for weather/prices), constitution_version, budgets |
 | `Member` | display name, role (`owner`, `adult`, `teen`, `child`, `guest`, `caregiver`), linked accounts (Amazon `sub`, Hirz login), presence source, preferences (temperature band, lighting, quiet hours, accessibility), verification methods, `is_trusted_contact` |
 | `TrustedContact` | may or may not be a member; verified channels (phone, email, Hirz app), safe word hash, relationship, last verified |
-| `Asset` | kind (`ev`, `home_battery`, `solar`, `appliance`, `hvac_zone`, `lock`, `camera`, `light`, `doorbell`), owner, adapter binding, capabilities, physical parameters (battery kWh, charger kW, zone thermal params), policies (`ev.soc_min`, `needed_by`) |
+| `Asset` | kind (`ev`, `home_battery`, `solar`, `appliance`, `hvac_zone`, `lock`, `camera`, `light`, `doorbell`, `shade`), owner, adapter binding, capabilities, physical parameters (battery kWh, charger kW, zone thermal params), policies (`ev.soc_min`, `needed_by`) |
 | `Schedule` | calendar events, expected arrivals/departures, routines (weekday morning, recovery morning), quiet hours |
 | `Preference` | typed key/value with owner member, scope (household or member), source (`declared`, `learned_accepted`), confidence |
 | `Policy` | pointer to the active constitution version plus per-member overrides |
 | `Observation` | live state snapshot from adapters with `observed_at`, `source` (`real`/`twin`), `staleness_seconds` |
 
-**Versioning.** Every mutation writes a new row version with `valid_from`/`valid_to`; the graph at any past instant is reconstructible, which is what makes "why did Hirz think Dad was home?" answerable. Constitution versions are separate (§5.2).
+**Versioning.** Current rows keep stable identity keys; prior versions live in matching history tables with UTC half-open `valid_from`/`valid_to` intervals. This reconstructs what was recorded at a past instant, not retroactive effective time. Updates require the expected `valid_from`; changed same-instant versions and backdated household writes are refused. No-op writes preserve their version. New facts start when recorded; existing scaffold rows start history at migration time. Deletion and retroactive corrections are deferred. Constitution versions are separate (§5.2).
 
-**Read model.** `Context Service` answers `get_household_context(scope, as_of)` in one query round trip from a materialized `household_context` view refreshed on write, so the MCP `get_household_context` tool stays inside the latency budget (§8).
+**Read model.** `ContextService.get_household_context(household_id, scope="all", as_of=None, member_id=None, allow_stale=False)` returns a `ContextSnapshot` (`hirz/graph/context.py`). Current reads query the materialized `household_context` view; historical reads reconstruct from current/history tables in one round trip. Graph writers serialize before mutation and refresh the whole view once in the same transaction; refresh failure rolls back graph/history changes. This is the small-graph implementation, not a measured latency claim (§8).
+
+Item 6 exposes `people`, `member` (UUID required), `energy`, `environment`, and `all`; `constraints`, `plan`, and `security` summaries wait for their subsystems. Snapshots carry household scope, `as_of`, last successful `read_at`, stale status/age, policy status, and typed-validated entity data. Missing facts remain unknown. Account links and private channel/safe-word hashes are excluded by the SQL projection; channel summaries expose only method availability and verification source/time. Scoped private repository reads remain available for later identity/Protect work. Observation sources retain all three labels from `docs/twin-and-scenarios.md` §5; observation age is calculated at the requested instant, and observation time is distinct from recorded time. Future and older-than-current samples are refused.
+
+The last successful current snapshot is cached per household in one service instance. `allow_stale=True` is for read-only callers only: availability failures may return that snapshot with recomputed age and stale status. No cache, historical reads, invalid inputs, missing entities, and malformed database data fail; no disk/shared cache exists. Default callers fail closed. Scalar/state freshness thresholds remain the risk engine's responsibility.
+
+**Item 6 storage.** People/trust, assets/bindings/policies, schedules/events/routines, preferences and observations have typed models in `hirz/graph/models.py`, structural columns and household-scoped foreign keys, plus validated JSONB attributes. Presence comes from observations, preferences from their own rows, and contact-method availability from channel summaries. The policy reference lives on the household; unvalidated seeded versions are unusable for decisions. Passkeys and runtime activation are not implemented here. The approved bootstrap exception and rejected alternatives are recorded in ADR-002.
 
 ### 5.2 Constitution Engine
 
@@ -498,7 +504,7 @@ graph LR
 | `households`, `members`, `member_accounts` (provider, `sub`), `member_passkeys` (credential id, public key, added_at, revoked_at), `trusted_contacts`, `contact_channels` (kind, value_hash, verified_at) | Graph: people and trust |
 | `assets`, `asset_bindings` (adapter, entity id), `asset_policies` | Graph: things |
 | `schedules`, `schedule_events`, `routines`, `preferences` | Graph: time and preferences |
-| `observations` | Latest state per entity with source and freshness; history in `observation_history` (partitioned by day) |
+| `observations` | Latest state per entity with source and freshness; history in `observation_history` (daily partitioning deferred by the item 6 ADR-002 amendment) |
 | `constitution_versions` (yaml, compiled_cedar, hash, analysis_report, activated_at), `constitution_proposals` (sentence, proposed_by, surface, drafted_patch, status) | Constitution history and rules proposed by voice |
 | `plans`, `plan_actions`, `plan_constraints`, `plan_alternatives` | Plans |
 | `actions`, `action_transitions` | Executor lifecycle |
@@ -514,7 +520,7 @@ graph LR
 
 ---
 
-### 6.1 Phase 0 foundation (approved 2026-09-17)
+### 6.1 Phase 0 foundation (approved 2026-09-17; historical baseline)
 
 SQLAlchemy Core (no ORM), async psycopg, and Alembic revision `0001_initial` provide
 only the five tables below. Every column is required; all foreign keys use no

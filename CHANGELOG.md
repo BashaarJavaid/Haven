@@ -8,6 +8,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 1 item 6: versioned Household Graph, household-scoped repositories,
+  redacted current/historical context, and explicit two-household demo bootstrap
+  with `hirz seed` / `hirz context`. Constitutions remain unvalidated; the bootstrap
+  exception and storage tradeoffs are recorded in [ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-6-amendment--2026-09-18-author-approved).
+  Operating procedures: [development](./docs/development.md); validation:
+  [item 6 evidence](./docs/verification-log.md#item-6--complete-2026-09-18).
+
 - 2026-09-18: Phase 0 item 5 complete: a second person followed the README on a clean machine (reported by the author; evidence entry in `docs/verification-log.md`). Phase 0 is done; Phase 1 item 6 is next.
 - 2026-09-18: `docs/verification-log.md` holds the full verification evidence per roadmap item; the Phase 0 paragraphs moved there verbatim and `ROADMAP.md` keeps one sentence per item with a link. `CLAUDE.md`/`AGENTS.md` gain a "Where records go" table (one home per kind of record) and a shorter "Current phase".
 - 2026-09-17: Phase 0 item 4 complete and verified on `main`: all

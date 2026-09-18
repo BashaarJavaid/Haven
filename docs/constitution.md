@@ -136,6 +136,8 @@ learning:
 
 The schema above is the full shape. The demo seed `constitutions/quinn-home.yaml` starts at version 7 **without** `never_for: [unexpected_visitor]`, because that rule is proposed by voice and activated on camera as version 8 (`docs/demo-script.md`); `constitutions/quinn-parents.yaml` is the small second seed for Mom and Dad's home, with Malik as a trusted contact.
 
+**Item 6 seed envelope (approved 2026-09-18).** Each seed has exactly two YAML documents: graph first, constitution second. The constitution document keeps the schema above. Item 6 validates graph data and the household/version envelope, and persists the constitution as `unvalidated`, without compiled Cedar or an activation timestamp. It does not validate rules or grant authority. The parents' seed is version 1 with the full rules above, including the unexpected-visitor restriction; the home seed is version 7 without that restriction. Item 7 must consume the second document and validate it before use. Bootstrap repetition is a no-op only for semantically identical, untouched households; changed/evolved households are refused. The exact synthetic graph data lives in the seed files; initialization commands are in [development procedures](./development.md).
+
 The closed list lives in `hirz/risk/classes.yaml` and is the same list the risk table uses. A constitution referencing an unknown class fails validation. Classes are namespaced `domain.class` and each carries its static risk profile (`ARCHITECTURE.md` §5.3). Adding a class is a code change with a test, because it also needs a risk profile, a Cedar action, and a tool mapping.
 
 ### 2.2 Modes and precedence within a rule
