@@ -283,6 +283,27 @@ coverage is not evidence of household application behavior. No cloud credentials
 Docker services, or browser are needed for default tests; the WebSocket test binds
 a temporary local port. Live database tests are selected explicitly below.
 
+## Continuous integration (Phase 0, item 4)
+
+The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
+manual dispatch using Ubuntu 24.04 x64 and the pinned toolchain above. It runs
+Python lint/types/tests with the 80% coverage gate, TypeScript lint/types/Vitest,
+Python package and fresh-wheel checks, and Docker build/non-root checks.
+The Python test job initializes an isolated Compose stack and runs migrations,
+`alembic check`, doctor, authenticated service checks, and the live PostgreSQL
+tests. Generated credentials stay in the runner's ignored `.env`; cleanup removes
+only that run's containers, volumes, and credentials.
+
+All eleven architecture job IDs are present. Scenarios, add-on conformance,
+latency, Cedar conformance, and release are **successful placeholders** with
+explicit deferral messages in their logs and job summaries. Browser tests and
+frontend bundles are also deferred. No AWS secrets or publication are involved.
+There are no cross-run dependency/Docker caches or artifact uploads.
+
+On GitHub, open **Actions → CI → Run workflow** for manual dispatch after the
+workflow reaches `main`. Item 4 remains pending until a green `main` run is
+verified; green placeholders do not claim application behavior or protection.
+
 ## Local development stack (Phase 0, items 2–3)
 
 Start Docker before running these commands from the repository root:

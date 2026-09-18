@@ -651,6 +651,29 @@ Things that never run inside a tool call: the MILP planner, Bedrock calls, the G
 
 ## 13. CI/CD (GitHub Actions)
 
+`.github/workflows/ci.yml` implements the Phase 0 scaffold with all eleven job
+IDs below. It runs on pushes, pull requests, and manual dispatch on Ubuntu 24.04
+x64, with read-only repository permissions, SHA-pinned actions, and the existing
+locked toolchain. Jobs are independent; superseded runs of the same event/ref
+are cancelled. Dependency/Docker caches and artifact uploads are disabled.
+
+Active checks are Ruff, strict mypy over `hirz/`, `scripts/`, and `alembic/`,
+service-free pytest with the 80% gate, both workspaces' lint/types/Vitest, Python
+sdist/wheel and fresh-wheel smoke checks, and Docker build/non-root verification.
+`python-test` reuses the existing initializer and Compose stack on a disposable
+runner: PostgreSQL and HA demo onboarding, Hirz readiness, explicit migrations,
+schema-drift check, doctor, authenticated service checks, and live PostgreSQL
+tests. Cleanup removes only that run's resources and generated `.env`.
+
+The scenario, add-on conformance, latency, Cedar conformance, and release jobs
+are explicit successful placeholders. Their logs and job summaries name the
+deferred work; TypeScript tests and build also disclose absent browser tests
+and frontend bundles. The release placeholder runs on every event and publishes
+nothing. Green scaffold CI does not establish any of these future guarantees.
+Item 4 remains pending until a green run on `main` is verified.
+
+The complete target remains:
+
 ```
 on: [push, pull_request, workflow_dispatch]
 jobs:

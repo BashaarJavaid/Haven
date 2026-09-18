@@ -8,6 +8,17 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-17: Phase 0 item 4 implemented, pending green CI on `main`: all
+  eleven GitHub Actions jobs, pinned tools/actions, read-only repository access,
+  existing Python/TypeScript checks, disposable Compose integration checks,
+  package/fresh-wheel and non-root container checks. Future scenario, conformance,
+  latency, Cedar, and release jobs are explicit successful placeholders; browser
+  tests and frontend bundles are also deferred. No AWS publication or new
+  application guarantees. The author merges the items 1–4 PR before main
+  verification and a follow-up completion-documentation PR.
+  Local verification: Python 36 passed, 86.13% coverage; PostgreSQL integration
+  4 passed; one Vitest test per workspace; lint/types, package/fresh-wheel,
+  isolated Compose service checks, schema drift, doctor, and container UID passed.
 - 2026-09-17: Phase 0 item 3 verified: Alembic `0001_initial` adds five
   foundation tables using SQLAlchemy Core and async psycopg, UUID identities,
   household-scoped account links, and per-household audit pointers. Explicit
