@@ -466,6 +466,7 @@ During the judging window there is also a hosted demo: one click seeds a throwaw
 - [`docs/submission.md`](./docs/submission.md) — hackathon checklist and the product-feedback / friction-log plan
 - [`docs/adr/`](./docs/adr/) — decisions and rejected alternatives
 - [`ROADMAP.md`](./ROADMAP.md) — build order as a living checklist, with the hackathon cut line
+- [`docs/verification-log.md`](./docs/verification-log.md) — the evidence behind every completed roadmap item: commands, numbers, environment, CI runs
 - [`SECURITY.md`](./SECURITY.md) — disclosure policy
 
 ## How this is built

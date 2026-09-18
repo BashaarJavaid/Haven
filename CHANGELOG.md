@@ -8,6 +8,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 0 item 5 complete: a second person followed the README on a clean machine (reported by the author; evidence entry in `docs/verification-log.md`). Phase 0 is done; Phase 1 item 6 is next.
+- 2026-09-18: `docs/verification-log.md` holds the full verification evidence per roadmap item; the Phase 0 paragraphs moved there verbatim and `ROADMAP.md` keeps one sentence per item with a link. `CLAUDE.md`/`AGENTS.md` gain a "Where records go" table (one home per kind of record) and a shorter "Current phase".
 - 2026-09-17: Phase 0 item 4 complete and verified on `main`: all
   eleven GitHub Actions jobs, pinned tools/actions, read-only repository access,
   existing Python/TypeScript checks, disposable Compose integration checks,

@@ -22,11 +22,31 @@ Hirz — house rules for the AI in your home, and your parents': a permissioned 
 - `docs/demo-script.md`, `docs/submission.md` — the video and the hackathon checklist. Load for Phase 8 work.
 - `docs/friction-log.md` — every friction point hit with a third-party tool, in Devpost's format, plus feature requests. Append to it as friction happens (see Conventions).
 - `docs/adr/` — one file per decision with rejected alternatives. Load the specific ADR for the component being touched.
-- `ROADMAP.md` — phased build order as a living checklist with `verify:` checks. Check at the start of a session to see what's next; update it as items complete.
+- `ROADMAP.md` — phased build order as a living checklist with `verify:` checks. Check at the start of a session to see what's next; update it as items complete, one sentence per item (see Where records go).
+- `docs/verification-log.md` — the full evidence behind every completed roadmap item. Append to it when closing an item; read it only when the numbers matter.
 
 ## Keeping the instruction files in sync
 
 This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex and other agents). They are **not** auto-generated. They are near-identical (only the top heading differs). Whenever you change one — Commands, Current phase, Conventions, or any substantive guidance — mirror the change into the other in the **same commit**.
+
+## Where records go
+
+Each kind of record has one home. Write it there once and link to it; never paste the same facts into a second file. This keeps `ROADMAP.md` and the instruction files (loaded every session) short without losing anything.
+
+| Record | Home | Size | Never |
+|---|---|---|---|
+| What an item must build and its `verify:` check | `ROADMAP.md`, the item itself | The item's spec sentence plus the `verify:` clause | Don't rewrite the spec when it is done |
+| That an item is done, and the headline evidence | `ROADMAP.md`, appended to the item | `**Complete (date).**` in front, and after the `verify:` clause **one sentence**: the two or three numbers that prove it, the CI run link if there is one, and a link to the evidence entry. A partial result says exactly what is still owed | No paragraphs, no environment details, no list of probes |
+| The full evidence: commands run, every number, environment, run links, what was deliberately not claimed | `docs/verification-log.md`, one `## Item N` heading per item, newest run appended under it | As long as the truth needs; nothing is trimmed | Never edited after the fact except to append a later run |
+| What changed in the repo and why, dated | `CHANGELOG.md`, `[Unreleased]` | A few lines per change; link to the ADR, item, or evidence entry instead of repeating them | Not a copy of the verification log |
+| A decision with its rejected alternatives | `docs/adr/`, one file, listed in `docs/adr/README.md`; a later change is an amendment in the same file, dated | | Not in `CHANGELOG.md` alone, not only in a commit message |
+| Third-party tool friction and feature requests | `docs/friction-log.md` (see Conventions) | Devpost's format, with URL and exact error text | Nothing invented or padded |
+| How a component works | `ARCHITECTURE.md` section, `docs/*.md` spec | | Not in the README, not in the roadmap |
+| Development and operations procedure (setup, recovery, reset, CI mechanics) | `docs/development.md` (the Phase 0 sections now in `README.md` move there before submission) | | Not in the README beyond the quickstart |
+| Where the project stands right now | `CLAUDE.md`/`AGENTS.md` "Current phase" | Under about 80 words: what is done, what is next, one caveat. Details live in the roadmap and the evidence log | Not a second verification log |
+| Pitch, demo story, tech stack, quickstart, pointers | `README.md` | | Not procedures, not evidence |
+
+When closing an item: append the evidence entry first, then the one-sentence roadmap line linking to it, then the changelog line, then shorten "Current phase". If a fact is already recorded somewhere, link to it.
 
 ## Conventions
 
@@ -81,7 +101,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 items 1–4 are complete and verified (2026-09-17); item 5 is next.** All eleven GitHub Actions jobs passed on `main` at merge commit `fdc06fca4499794b55a84ffcae6e8203654b2a9b` ([run 35310102678](https://github.com/BashaarJavaid/Hirz/actions/runs/35310102678)). The workflow runs existing scaffold checks and explicitly labels future checks as successful placeholders. Item 5 still requires a second person to follow the README on a clean machine; a 2026-09-18 run of the README's "Scaffold setup" and "Local development stack" commands on the existing dev machine matched every number claimed above but does not satisfy that check (see `ROADMAP.md` item 5). Do not treat placeholder success as an application guarantee. The Python package and both TypeScript workspaces have tests, lint/type checks, and locked dependencies. The localhost-only Compose stack has Postgres 16, HA demo devices with automated token provisioning, a Hirz `/health` endpoint, and optional Jaeger. Alembic creates five foundation tables with UUID identities, household-scoped account links, and per-household audit pointers. Explicit initialization provisions a local signing key; `hirz doctor` gives four PASS results after migration on a clean source snapshot with fresh volumes. Python: 36 passed, 86.13% runtime coverage; live PostgreSQL integration: 4 passed. Ruff, strict mypy including migrations, locked sync, build, fresh-wheel CLI, invalid-credential/key checks, and unchanged credentials on reinitialization passed. These are scaffold checks, not application guarantees. No household application behavior, graph history/repositories/seeds, audit writer, MCP, or worker is built. The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. A second, external critique was worked through the same day (authorization chain, visitor and scam semantics, async conversation honesty, local relock, fair backtest, derived rule preview, pause, ADR-010); it has its own `CHANGELOG.md` entry. Continue with `ROADMAP.md` item 5. Do not pull forward Phase 1 work while scaffolding.
+**Phase 0 is complete and verified (items 1–4 on 2026-09-17, item 5 on 2026-09-18); Phase 1 item 6 is next.** Scaffold only: package, Compose stack, five foundation tables, `hirz doctor`, and CI with five labeled placeholder jobs; no household application behavior exists, and green placeholders prove nothing. Evidence per item is in `docs/verification-log.md`; the design revisions of 2026-09-17 (two critiques) are summarized in `CHANGELOG.md`. Item 5's second-person run was reported by the author, not captured in the repo.
 
 ---
 
