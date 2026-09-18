@@ -1,18 +1,58 @@
-"""Static action catalog; dynamic risk scoring belongs to item 8."""
+"""Validated action catalog and the single band-to-floor mapping."""
 
+from enum import StrEnum
 from importlib.resources import files
-from typing import TypedDict, cast
+from typing import Literal, TypedDict, cast
 
 import yaml
+
+
+class RiskBand(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+def floor_outcome(band: RiskBand) -> Literal["none", "ask", "never_auto"]:
+    floors: dict[RiskBand, Literal["none", "ask", "never_auto"]] = {
+        RiskBand.LOW: "none",
+        RiskBand.MEDIUM: "none",
+        RiskBand.HIGH: "ask",
+        RiskBand.CRITICAL: "never_auto",
+    }
+    return floors[band]
 
 
 class Profile(TypedDict):
     impact: int
     reversibility: str
     band: str
+    freshness_seconds: int
 
 
-CLASSES = cast(
-    dict[str, Profile],
-    yaml.safe_load(files(__package__).joinpath("classes.yaml").read_text()),
-)
+def load_catalog(text: str) -> dict[str, Profile]:
+    catalog = yaml.safe_load(text)
+    if not isinstance(catalog, dict) or not catalog:
+        raise ValueError("Invalid risk catalog")
+    for name, profile in catalog.items():
+        if (
+            not isinstance(name, str)
+            or len(name.split(".")) != 2
+            or not all(part.isidentifier() for part in name.split("."))
+            or not isinstance(profile, dict)
+            or set(profile) != set(Profile.__annotations__)
+            or type(profile["impact"]) is not int
+            or not 1 <= profile["impact"] <= 5
+            or not isinstance(profile["reversibility"], str)
+            or not profile["reversibility"].strip()
+            or not isinstance(profile["band"], str)
+            or profile["band"] not in RiskBand.__members__
+            or type(profile["freshness_seconds"]) is not int
+            or profile["freshness_seconds"] <= 0
+        ):
+            raise ValueError("Invalid risk catalog profile")
+    return cast(dict[str, Profile], catalog)
+
+
+CLASSES = load_catalog(files(__package__).joinpath("classes.yaml").read_text())

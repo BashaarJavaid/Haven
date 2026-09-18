@@ -8,6 +8,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 1 item 8: standalone deterministic risk scoring, typed facts
+  and canonical risk results, catalog freshness thresholds, and a shared floor
+  function used by constitution validation. Semantics and boundaries:
+  [ADR-004](./docs/adr/ADR-004-no-ml-risk-scoring.md#item-8-amendment--2026-09-18-author-approved);
+  checks and API output: [item 8 evidence](./docs/verification-log.md#item-8--complete-2026-09-18).
+
 - 2026-09-18: Phase 1 item 7: validated constitution engine, canonical Action,
   deterministic English/situation preview, native Dogwood compiler and local
   boundary, and database-free `constitution validate|compile|preview` commands.

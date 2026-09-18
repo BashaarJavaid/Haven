@@ -78,7 +78,8 @@ tests, lint/type checks, `uv build`, and the local Compose stack with explicit
 initialization and service checks, Alembic migrations, and the local doctor.
 Item 6 also supplies explicit demo seeding and redacted context reads. Item 7 adds
 read-only constitution validation, compilation, and preview; native Dogwood setup
-is in `docs/development.md`. The other commands below remain target state.
+is in `docs/development.md`. Item 8 adds standalone Python risk scoring; its API
+smoke procedure is also in `docs/development.md`. The other commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -108,7 +109,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 and Phase 1 items 6–7 are complete and verified locally; item 8 (risk engine) is next.** The constitution engine, read-only CLI, native Dogwood compiler/boundary and derived preview pass local checks. Stored seed versions remain unvalidated and preserve their old hashes; no runtime pipeline, activation, authenticated approval, signed audit or device actions exist. Evidence: `docs/verification-log.md`; setup: `docs/development.md`. AWS comparison remains item 37; four CI jobs remain placeholders.
+**Phase 0 and Phase 1 items 6–8 are complete and verified locally; item 9 (decision pipeline) is next.** Constitution evaluation, native Dogwood, preview, and standalone risk scoring pass local checks. Stored seeds remain unvalidated with their old hashes; runtime pipeline integration, activation, authenticated approvals, signed audit and device actions are still pending. Evidence: `docs/verification-log.md`; setup/API smoke: `docs/development.md`. AWS comparison remains item 37; four CI jobs remain placeholders.
 
 ---
 

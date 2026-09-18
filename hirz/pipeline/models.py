@@ -1,11 +1,11 @@
-"""Canonical Action from ARCHITECTURE §4.1; no execution authority."""
+"""Canonical Action and risk assessment from ARCHITECTURE §4; no authority."""
 
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
-from hirz.risk import CLASSES
+from hirz.risk import CLASSES, RiskBand
 
 Role = Literal["owner", "adult", "caregiver", "teen", "child", "guest", "unknown"]
 ROLES: tuple[Role, ...] = (
@@ -21,6 +21,27 @@ ROLES: tuple[Role, ...] = (
 
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+
+class RiskFactor(Model):
+    factor: Literal[
+        "unknown_requester",
+        "occupant_asleep",
+        "guest_present",
+        "state_stale",
+        "deviation_from_baseline",
+        "scam_pattern",
+        "outside_bounds",
+        "scoring_error",
+    ]
+    effect: Literal["+1 band", "→ CRITICAL"]
+    evidence: str
+
+
+class RiskAssessment(Model):
+    band: RiskBand
+    base_band: RiskBand
+    factors: tuple[RiskFactor, ...]
 
 
 class Target(Model):

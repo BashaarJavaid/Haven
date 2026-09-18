@@ -300,16 +300,69 @@ Deterministic, table-driven, no ML ([ADR-004](./docs/adr/ADR-004-no-ml-risk-scor
 | Factor | Applies to | Effect |
 |---|---|---|
 | `unknown_requester` | all | +1 band |
-| `occupant_asleep` | `energy.hvac_adjust`, `energy.appliance_start`, `environment.lights` in bedrooms | +1 band |
+| `occupant_asleep` | HVAC: asleep in target zone; appliances: asleep anywhere; lights: target is a bedroom with someone asleep there | +1 band |
 | `guest_present` | `security.door_unlock`, `security.camera_disable`, `security.access_code_share` | +1 band |
 | `state_stale` (observation older than class threshold; for `security.door_unlock`, also the doorbell reporting offline: if Hirz cannot see the door it is more cautious about opening it) | all | +1 band |
-| `deviation_from_baseline` (e.g. thermostat change > 6 °F from member preference) | `energy.hvac_adjust` | +1 band |
+| `deviation_from_baseline` (absolute requested temperature difference > 6 °F from the resolved requester's preference) | `energy.hvac_adjust` | +1 band |
 | `scam_pattern` (urgency + money + unverified channel, from Protect) | `finance.transfer_money`, `finance.change_payee`, `security.access_code_share`, `finance.verify_request` outcome | → CRITICAL |
-| `outside_bounds` (constitution bounds exceeded) | any bounded class | +1 band |
+| `outside_bounds` (any existing constitution guard exceeded, including temperature, EV floor, unlock duration, camera-off duration) | any bounded class | +1 band; the constitution's hard denial still holds |
 
 **Bands and floors.** `LOW` → no floor. `MEDIUM` → constitution decides. `HIGH` → floor is ASK. `CRITICAL` → floor is never-auto; the pipeline returns DENY or VERIFY. A constitution can move any class up (e.g. make `environment.lights` ask at night) and never down. Bands are compared in exactly one function, `risk.floor_outcome(band)`, so thresholds have a single home.
 
-**Failure.** An exception during scoring is treated as CRITICAL. A crashed risk calculation is not "low risk".
+**Item 8 contract (author-approved, 2026-09-18).**
+`hirz.risk.engine.score(action, facts, rule) -> RiskAssessment` is synchronous,
+pure, and grants no authority. `action` is the canonical validated `Action` and
+`rule` is its selected validated constitution `Rule`; the scorer reads only the
+rule's existing guards, not its mode, conditions, or approval configuration.
+`RiskAssessment` and `RiskFactor` live beside `Action` in the canonical model
+module. The assessment is the §4.2 `risk` object: lowercase `band`, `base_band`,
+and ordered `factors` with `factor`, `effect`, and `evidence`. No `Decision`,
+execution path, audit writer, or runtime enforcement is implemented by item 8.
+
+`RiskFacts` is a frozen, extra-forbidden Pydantic model. Scoring accepts the model
+or a mapping and validates it inside the fail-closed boundary, including model
+instances created through validation-bypassing helpers. Its fields are:
+
+| Field | Meaning |
+|---|---|
+| `observation_ages_seconds` | Tuple of finite, nonnegative ages of **all** observations relevant to the action; `()` explicitly means none are required |
+| `sleeping_in_target_zone`, `sleeping_any`, `target_is_bedroom` | Strict Boolean occupancy/zone facts; only applicable sleep predicates are required |
+| `guest_present` | Strict Boolean, required only for the three security classes in the table; not `security.arm_disarm` |
+| `doorbell_online` | Strict Boolean, required for door unlock; false contributes `state_stale` |
+| `baseline_target_f` | Resolved requester's temperature preference, required for HVAC; uses the existing constitution Decimal validation |
+| `scam_pattern` | Strict Boolean from trusted deterministic code, required only for the four classes in the table; never model-assisted advice |
+
+Missing/null fields stay unknown; applicable unknowns produce CRITICAL, while
+irrelevant fields may be omitted. Invalid supplied fields fail validation even
+when irrelevant. The resolved Action role alone determines `unknown_requester`;
+names, speaker hints, and missing member IDs do not independently trigger it.
+The caller owns household scope, rule selection, the complete observation set,
+and trustworthy fact derivation. Graph-to-facts mapping remains item 9; raw
+Protect extraction/weighting remains item 32. Ages are supplied, never computed
+from a wall-clock read inside scoring, and the risk result does not relabel any
+underlying observation's source.
+
+The validated catalog gives every `security.*` class a `freshness_seconds` of 60
+and every other class 300. These are approved policy thresholds, not measured
+sensor guarantees. Only age **greater than** the threshold is stale. Each
+distinct +1 factor contributes once, cumulatively, capped at CRITICAL; all
+matching evidence is retained in table order even after saturation. Multiple
+old observations and an offline doorbell together still contribute one
+`state_stale`. A true scam flag forces CRITICAL, including for the LOW-base
+`finance.verify_request`; its later pipeline terminal is VERIFY. An empty
+observation tuple is a caller assertion, not a fallback for missing data.
+
+`risk.floor_outcome(band)` returns `none` for LOW/MEDIUM, `ask` for HIGH, and
+`never_auto` for CRITICAL. Constitution no-auto validation uses this same
+function. Item 9 owns applying floors to decisions and choosing DENY or VERIFY;
+a passing item 8 test does not establish that runtime enforcement.
+
+**Failure.** Missing required facts, malformed scoring inputs, or an exception
+during scoring produce CRITICAL and a final `scoring_error` factor with effect
+`→ CRITICAL`. Evidence uses fixed reasons or known field names, never raw input
+or exception text. Known base band and completed evidence are retained; an
+unresolvable catalog lookup uses CRITICAL as its base. Malformed catalog data
+prevents successful initialization. A crashed risk calculation is not "low risk".
 
 ### 5.4 Planner
 
@@ -366,7 +419,7 @@ Turns member requests and household facts into constraints and detects conflicts
 The trust layer. Two halves: gating physical actions (through the pipeline like everything else, with `guest_present`, `unknown_requester` factors and the constitution's security domain) and **request verification**, which is the household-graph capability that answers "is this really Dad?" from verified records instead of from the caller.
 
 - **Trusted contacts and verified channels.** A contact may or may not be a member and may live in another Hirz household (Malik is a trusted contact of his parents' household and answers from his own app; no login spans two households in v1). Each contact has channels verified out-of-band at setup (a code sent to the number, a confirmation tapped in the contact's own Hirz app). A channel presented during a request is compared against verified channels; it is never added as verified because a caller said so.
-- **Request assessment.** `assess_request_risk` extracts signals from the member's description of the request with a small deterministic signal set (financial ask, urgency language, secrecy ask, third-party recipient, unverified channel, claimed authority such as "the bank" or "Amazon"). Signals are weighted into a band; `scam_pattern` fires when a financial or access request coincides with an unverified channel and urgency. The LLM is allowed only to extract the signals as structured output when `HIRZ_LLM` is on; the weighting and the band are code, and the model's signals are unioned with the keyword extractor's, so a model can add a warning and never remove one. Schema validation checks the shape of an extraction, not its truth, so the tests include wrong and empty model outputs. A model therefore influences Protect's advice and nothing else: the only classes `scam_pattern` touches are already `never` with a CRITICAL floor. Hirz cannot see the call. A presented number is compared with the contact's verified channels only when the member reads it out, and the answer is "matches the number you have saved" or "does not match", never "it is really him", because caller ID can be forged; when no number is given Hirz says nothing about it. The check through the verified contact is offered at every band, including LOW, not only when `scam_pattern` fires. In offline mode a keyword extractor does the same job with lower recall, and the response says so.
+- **Request assessment.** `assess_request_risk` extracts signals from the member's description of the request with a small deterministic signal set (financial ask, urgency language, secrecy ask, third-party recipient, unverified channel, claimed authority such as "the bank" or "Amazon"). Signals are weighted into a band; `scam_pattern` fires when a financial or access request coincides with an unverified channel and urgency. The LLM is allowed only to extract the signals as structured output when `HIRZ_LLM` is on; the weighting and the band are code, and the model's signals are unioned with the keyword extractor's, so a model can add a warning and never remove one. Schema validation checks the shape of an extraction, not its truth, so the tests include wrong and empty model outputs. A model therefore influences Protect's advice and nothing else. Runtime risk accepts only the deterministic trusted-code scam flag, never the union with model-extracted signals. Besides the already-CRITICAL money and access-code classes, `scam_pattern` can raise the LOW-base `finance.verify_request` to CRITICAL, whose later pipeline terminal is VERIFY (§5.3); it does not authorize a financial or security action. Hirz cannot see the call. A presented number is compared with the contact's verified channels only when the member reads it out, and the answer is "matches the number you have saved" or "does not match", never "it is really him", because caller ID can be forged; when no number is given Hirz says nothing about it. The check through the verified contact is offered at every band, including LOW, not only when `scam_pattern` fires. In offline mode a keyword extractor does the same job with lower recall, and the response says so.
 - **Verification methods** (in order of strength): confirmation in the subject's own Hirz app (push, biometric-gated by the phone), a call-back to a verified number (real: telephony provider adapter, out of hackathon scope; twin: simulated), the household safe word (compared as a hash, never spoken by Hirz), and a verified email. `verify_trusted_identity` opens a `VerificationCase`, sends the check-in, and reports status. The check-in names the specific request ("Did you just call her from another number asking for $500?") with three answers: **No, that wasn't me**, **Yes, that was me**, **I'll call her**. A yes confirms that request and nothing more, and Hirz still tells the member to talk to the contact on their saved number. Alexa cannot speak when the reply arrives, so the first response says "ask me again in a minute", the card and the member's phone update on their own, and the result is spoken when the member asks. No reply by the expiry is `no_answer`: "Malik hasn't answered. Don't send anything. Call the number you have saved for him."
 - **Organization verification.** `assess_request_risk` with `claimed_party: organization` checks a claimed organization's presented channel against the household's stored verified contacts for that organization (the utility's real number saved at onboarding) and against a small curated registry shipped with Hirz. Hirz never asserts an organization is legitimate from information the caller supplied; it says "matches your saved contact", "does not match", or "not enough information".
 - **Doorbell flow (Ring).** Ring events arrive by webhook (HMAC-SHA256 verified). Four are used: `button_press` and `motion_detected` (with its `human`/`animal`/`vehicle` classification: "a vehicle arrived at 6:58, Mom is expected at 7:00") feed the `visitor_context`; `device_offline` on the doorbell raises the `state_stale` factor for `security.door_unlock`; `device_online` clears it. Protect matches a press against expected arrivals in `Schedule`, produces a `visitor_context` (expected: Mom at 19:00 ± 30 min; unexpected: unknown), and the companion app and the MCP App show the snapshot with that context. Three facts stay separate in the data and in every sentence: someone is expected around now; a visitor is at the door; an authenticated member has confirmed who it is. The schedule never turns the second into the third. Approval text reads "Someone is at the front door. Mom is expected now.", never "Unlock for Mom", and a stranger who rings inside Mom's window gets the same sentence and the same phone approval (`scenarios/stranger-in-window.yaml`). An *unexpected visitor* means a press that matches no expected arrival window; it does not mean a person Hirz failed to recognize, because Hirz recognizes nobody. Ring is an event and media source only; its Partner API has no lock or access-control capability. Any unlock is a `security.door_unlock` action on the `devices` adapter (a Home Assistant lock, real or twin) through the pipeline; when the household's constitution carries `never_for: [unexpected_visitor]`, it applies as a hard veto (it is the household's rule, not a built-in floor; without it an unexpected visitor is an `ask` on the phone). No face recognition: Hirz never claims to identify a person from video ([THREAT_MODEL](./THREAT_MODEL.md)).

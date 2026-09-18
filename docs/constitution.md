@@ -357,7 +357,7 @@ Activation is refused while any `ask` for a class whose rule is changing has a p
 | Situation | Resolution | Why |
 |---|---|---|
 | Malik (owner) asks to pre-warm the living room to 72 at 17:35; nobody asleep | `auto` → EXECUTE | `energy.hvac_adjust` auto, bounds met, condition met, band LOW |
-| Same, at 23:40, Mom asleep in the living room target zone | `ask` → ASK | exact-zone override → ask; dynamic risk evaluation remains item 8 |
+| Same, at 23:40, Mom asleep in the living room target zone | `ask` → ASK | exact-zone override → ask; standalone risk scoring is in architecture §5.3; pipeline composition remains item 9 |
 | Teen asks Alexa to unlock the front door | `never` → DENY_CONSTITUTION | `per_role.teen.security.door_unlock: never` |
 | Malik asks to unlock the door for "the plumber" not on the schedule, under version 7 (no `never_for`) | `ask` → ASK on the phone | The household has not written a veto; a security class still asks, and never by voice |
 | The same request after Malik activates version 8 with `never_for: [unexpected_visitor]` | DENY_CONSTITUTION, citing version 8 | The household wrote the veto; it holds regardless of the requester. Same lock, different outcome, because the family changed the rule |
@@ -378,7 +378,7 @@ in `tests/unit/test_constitution.py` and `tests/cedar_conformance/test_local.py`
 | Worked example | Item 7 assertion | Checks still owed |
 |---|---|---|
 | Owner pre-warms within bounds, nobody asleep | `auto`; native permit without approval | Runtime risk, execution, audit, read-back |
-| Someone asleep in target zone | `ask`; approval needed; adjacent sleeping zone alone does not match | Dynamic risk factors, notification |
+| Someone asleep in target zone | `ask`; approval needed; adjacent sleeping zone alone does not match | Pipeline risk integration, notification |
 | Teen unlock | `never`, even with an approval trace | Linked-account identity and pipeline denial row |
 | Unexpected visitor under v7 | `ask`, phone channel | Visitor-context assembly, phone authentication |
 | Unexpected visitor under v8 | `never`, even after prior approval | Activation, production visitor events, audit |

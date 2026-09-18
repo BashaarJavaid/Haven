@@ -1,21 +1,21 @@
-energy.optimize_cost: {impact: 2, reversibility: reversible, band: LOW}
-energy.hvac_adjust: {impact: 2, reversibility: reversible, band: LOW}
-energy.ev_charge: {impact: 2, reversibility: reversible, band: LOW}
-energy.battery_dispatch: {impact: 2, reversibility: reversible, band: LOW}
-energy.appliance_start: {impact: 2, reversibility: delayed, band: MEDIUM}
-environment.lights: {impact: 1, reversibility: reversible, band: LOW}
-environment.comfort_profile: {impact: 2, reversibility: reversible, band: LOW}
-environment.shades: {impact: 2, reversibility: reversible, band: LOW}
-health.routine_reminders: {impact: 1, reversibility: reversible, band: LOW}
-health.comfort_preferences: {impact: 1, reversibility: reversible, band: LOW}
-health.medical_decisions: {impact: 5, reversibility: irreversible, band: CRITICAL}
-communication.notify_member: {impact: 1, reversibility: reversible, band: LOW}
-communication.contact_trusted_contact: {impact: 1, reversibility: reversible, band: LOW}
-communication.contact_emergency_services: {impact: 5, reversibility: irreversible, band: HIGH}
-security.door_unlock: {impact: 5, reversibility: irreversible (while open), band: HIGH}
-security.camera_disable: {impact: 4, reversibility: reversible with exposure window, band: HIGH}
-security.access_code_share: {impact: 5, reversibility: irreversible, band: CRITICAL}
-security.arm_disarm: {impact: 4, reversibility: reversible with exposure window, band: HIGH}
-finance.transfer_money: {impact: 5, reversibility: irreversible, band: CRITICAL}
-finance.change_payee: {impact: 5, reversibility: irreversible, band: CRITICAL}
-finance.verify_request: {impact: 1, reversibility: reversible, band: LOW}
+energy.optimize_cost: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+energy.hvac_adjust: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+energy.ev_charge: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+energy.battery_dispatch: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+energy.appliance_start: {impact: 2, reversibility: delayed, band: MEDIUM, freshness_seconds: 300}
+environment.lights: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}
+environment.comfort_profile: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+environment.shades: {impact: 2, reversibility: reversible, band: LOW, freshness_seconds: 300}
+health.routine_reminders: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}
+health.comfort_preferences: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}
+health.medical_decisions: {impact: 5, reversibility: irreversible, band: CRITICAL, freshness_seconds: 300}
+communication.notify_member: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}
+communication.contact_trusted_contact: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}
+communication.contact_emergency_services: {impact: 5, reversibility: irreversible, band: HIGH, freshness_seconds: 300}
+security.door_unlock: {impact: 5, reversibility: irreversible (while open), band: HIGH, freshness_seconds: 60}
+security.camera_disable: {impact: 4, reversibility: reversible with exposure window, band: HIGH, freshness_seconds: 60}
+security.access_code_share: {impact: 5, reversibility: irreversible, band: CRITICAL, freshness_seconds: 60}
+security.arm_disarm: {impact: 4, reversibility: reversible with exposure window, band: HIGH, freshness_seconds: 60}
+finance.transfer_money: {impact: 5, reversibility: irreversible, band: CRITICAL, freshness_seconds: 300}
+finance.change_payee: {impact: 5, reversibility: irreversible, band: CRITICAL, freshness_seconds: 300}
+finance.verify_request: {impact: 1, reversibility: reversible, band: LOW, freshness_seconds: 300}

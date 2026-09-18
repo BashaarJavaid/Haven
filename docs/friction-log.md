@@ -28,6 +28,20 @@ An earlier entry dated 2026-09-15 about unreachable design-guide links was remov
 
 | 9 | 2026-09-18 | Dogwood source build | Build the pinned native CLI reproducibly | Ran Cargo with `--locked` at [revision 996d756](https://github.com/dogwood-policy/dogwood/tree/996d756de1013b7ae209a14f566a80375a59f2f0) | Use an upstream dependency lock | `error: cannot create the lock file /private/tmp/hirz-item7-dogwood/Cargo.lock because --locked was passed to prevent this` | Minor | Built once without `--locked`, retained the generated `scripts/dogwood.Cargo.lock`, and use it for subsequent native/container builds. The source revision has no lockfile; this is packaging friction, not a temporal-semantics failure. | Publish a CLI dependency lock alongside pinned releases |
 
+Item 8 follow-up to entry 6 (2026-09-18): `uv run --locked ruff format` hit:
+
+```text
+error: Failed to initialize cache at `/Users/bashaarjavaid/.cache/uv`
+  cause: failed to open file `/Users/bashaarjavaid/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+```
+
+Using `UV_CACHE_DIR=/private/tmp/hirz-uv-cache` let the same command pass without
+escalation. This is the same sandbox restriction, not a new upstream defect;
+the [uv CLI reference](https://docs.astral.sh/uv/reference/cli/) is the tool reference.
+The full pytest run also hit entry 6's existing loopback restriction:
+`PermissionError: [Errno 1] error while attempting to bind on address ('127.0.0.1', 0): [errno 1] operation not permitted`.
+The suite was rerun with sandbox escalation for those disposable local sockets.
+
 ## Candidates (not yet hit)
 
 - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be invoked proactively.

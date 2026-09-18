@@ -131,3 +131,50 @@ channels must exclude alexa, including never rules`. Their rows, hashes and
 force a change, or edit the stored YAML/hash: the later activation workflow owns
 new stored constitution versions. Corrected files can seed a fresh disposable
 household for tests. Bootstrap remains the explicit item 6 exception.
+
+## Standalone risk scoring (item 8)
+
+The [risk contract](../ARCHITECTURE.md#53-risk-engine) accepts a canonical Action,
+typed facts, and its selected validated Rule. This example uses explicitly
+synthetic constitution-preview data; it does not read live observations, access
+the database, approve anything, or act on a device. `hirz decide` remains item 11.
+
+Run from the repository root:
+
+```sh
+uv run --locked python - <<'PY'
+from pathlib import Path
+from unittest.mock import patch
+
+from hirz.constitution.preview import situation
+from hirz.constitution.schema import load
+from hirz.risk import floor_outcome
+from hirz.risk.engine import RiskFacts, score
+
+policy = load(Path("constitutions/quinn-home.yaml"))
+action, _ = situation(policy, "energy.hvac_adjust")
+rule = policy.rule(action.action_class, action.requested_by.role)
+ordinary = RiskFacts(observation_ages_seconds=(0,),
+                     sleeping_in_target_zone=False, baseline_target_f=72)
+escalated = RiskFacts(observation_ages_seconds=(301,),
+                      sleeping_in_target_zone=True, baseline_target_f=65)
+for label, facts, expected in (("ordinary", ordinary, "low"),
+                                ("escalated", escalated, "critical")):
+    result = score(action, facts, rule)
+    assert result.band == expected
+    print(label, result.model_dump_json(), "floor=" + floor_outcome(result.band))
+with patch("hirz.risk.engine.guards", side_effect=RuntimeError("injected failure")):
+    result = score(action, ordinary, rule)
+    assert result.band == "critical" and result.factors[-1].factor == "scoring_error"
+    print("exception", result.model_dump_json(), "floor=" + floor_outcome(result.band))
+PY
+```
+
+The ordinary result is LOW with no floor. Sleep, stale state, and deviation
+together reach CRITICAL; the injected exception also produces CRITICAL. Both
+have `never_auto` floors. These are synthetic test inputs, not observed household
+conditions. To test the implementation, run
+`uv run --locked pytest tests/unit/test_risk.py --no-cov`, then the full Python
+checks above with the pinned native Dogwood binary available. A sandbox that
+cannot write uv's normal cache can set `UV_CACHE_DIR` to a writable temporary
+directory; this changes tooling storage only.

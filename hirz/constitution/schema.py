@@ -11,7 +11,7 @@ from yaml.nodes import ScalarNode
 from hirz.constitution.conditions import TIME, number, parse
 from hirz.graph.seeds import UniqueLoader
 from hirz.pipeline.models import ROLES, Model, Role
-from hirz.risk import CLASSES
+from hirz.risk import CLASSES, RiskBand, floor_outcome
 
 
 class ConstitutionLoader(UniqueLoader):
@@ -254,7 +254,7 @@ class Constitution(Model):
                 if action_class not in CLASSES:
                     raise ValueError("Unknown action class")
                 if (
-                    CLASSES[action_class]["band"] in ("HIGH", "CRITICAL")
+                    floor_outcome(RiskBand[CLASSES[action_class]["band"]]) != "none"
                     and rule.mode == "auto"
                 ):
                     raise ValueError("Static HIGH/CRITICAL classes cannot be auto")

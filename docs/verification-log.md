@@ -307,3 +307,83 @@ container UID 10001/native validation/approval permit/no-approval deny all passe
 with explicit checks for numeric English, canonical fields, packaged catalogs,
 and absence of Cargo. This supersedes the earlier checkpoint totals above; graph
 integration and the preserved stored-seed observations are unchanged.
+
+## Item 8 — Complete (2026-09-18)
+
+Implemented the standalone risk scorer and shared floor function, with the
+author-approved semantics recorded in [ADR-004](./adr/ADR-004-no-ml-risk-scoring.md#item-8-amendment--2026-09-18-author-approved)
+and [architecture §5.3](../ARCHITECTURE.md#53-risk-engine). The existing catalog's
+21 profiles retain their prior base bands, impacts and reversibility strings;
+freshness policy is added to that catalog. The constitution validator now uses
+the shared floor function. This is scoring and validation, not a runtime pipeline.
+
+### Environment and commands
+
+Local Darwin arm64, Python **3.12.13**, uv **0.12.15**, pytest **9.1.1**,
+Hypothesis **6.168.0**, existing pinned native `.tools/dogwood` reporting
+**1.0.0**. No dependencies or lockfiles changed. Tooling used
+`UV_CACHE_DIR=/private/tmp/hirz-uv-cache` after the sandbox refused the normal
+uv cache. The full suite used `HIRZ_DOGWOOD="$PWD/.tools/dogwood"`.
+
+| Command | Observed result |
+|---|---|
+| `uv run --locked pytest tests/unit/test_risk.py --no-cov -q` | **260 passed in 0.77s**, no warnings |
+| `uv run --locked pytest --hypothesis-show-statistics` with sandbox escalation for existing disposable localhost tests | **443 passed, 11 deselected in 49.32s**; **93.75%** runtime coverage (1920 statements, 120 missed), 80% gate passed |
+| Native generated conformance, included in that full run | Three properties, each **200 passing, 0 failing, 0 invalid** cases: **600** total |
+| Coverage of `hirz/risk/__init__.py` and `hirz/risk/engine.py` | **100% line coverage** each (26 and 77 statements respectively); not a claim of exhaustive runtime security |
+| `uv run --locked ruff check .` | `All checks passed!` |
+| `uv run --locked ruff format --check .` | `68 files already formatted` |
+| `uv run --locked mypy hirz/ scripts/ alembic/` | `Success: no issues found in 31 source files` |
+| `uv build` | Successfully built `dist/hirz-0.0.0.tar.gz` and `dist/hirz-0.0.0-py3-none-any.whl` |
+| Documented standalone API example | Extracted and executed the exact Python block in [development](./development.md#standalone-risk-scoring-item-8); all assertions passed; output below |
+| `git diff --check` | Exit 0, no whitespace errors |
+
+The risk checks cover all classes, matching/nonmatching factors, all 32
+combinations of the five applicable HVAC increments, saturation with retained
+evidence, stale-factor deduplication, exact freshness/deviation/guard boundaries,
+sleep scope, missing and malformed facts, malformed catalog data, injected
+exceptions, sanitized failure output, immutable/revalidated facts, deterministic
+outputs and unchanged inputs. Both seed constitutions reject static HIGH/CRITICAL
+auto changes; dynamically CRITICAL risk keeps `never_auto` across validated
+auto/ask/never rule variants. Existing hard bounds still resolve to denial.
+
+### API smoke output
+
+```text
+ordinary {"band":"low","base_band":"low","factors":[]} floor=none
+escalated {"band":"critical","base_band":"low","factors":[{"factor":"occupant_asleep","effect":"+1 band","evidence":"An occupant is asleep in the affected area."},{"factor":"state_stale","effect":"+1 band","evidence":"Observation age 301.0s exceeds 300s."},{"factor":"deviation_from_baseline","effect":"+1 band","evidence":"Requested temperature differs from requester's preference by 7°F (>6°F)."}]} floor=never_auto
+exception {"band":"critical","base_band":"low","factors":[{"factor":"scoring_error","effect":"→ CRITICAL","evidence":"Risk calculation failed."}]} floor=never_auto
+```
+
+These are labeled synthetic preview inputs and a deliberately injected exception,
+not observed household conditions. No device, model, network service, database,
+or active constitution was involved in the smoke example.
+
+### Earlier failures and limits
+
+The first focused run reported **4 failed, 256 passed**. Two test setups compared
+a supplied risk rule with different seed-rule bounds; two mode variants retained
+per-role restrictions that made the variants invalid constitutions. Corrected the
+tests to select matching guards and construct valid variants. A deliberately
+bypassed Pydantic fact instance emitted a serialization warning; scoring now
+suppresses serialization warnings during its revalidation so malformed values
+are not echoed. The focused rerun above passed without warnings.
+
+The first full run inside the sandbox reported **2 failed, 441 passed,
+11 deselected in 49.53s**, with the same **93.75%** coverage and all 600 generated
+conformance cases passing. Both failures were existing WebSocket token tests
+unable to bind a temporary localhost port, not scorer failures. The full rerun
+with sandbox escalation passed as recorded above. Cache and socket friction are
+recorded once in [friction log entry 6's item 8 follow-up](./friction-log.md).
+
+No remote CI run, AWS comparison, database integration run, frontend checks,
+container rebuild or installed-wheel smoke was performed for this Python-only
+item. No graph extraction, identity resolution, runtime Decision, approvals,
+audit writes, activation, or device execution is claimed. Pipeline integration
+is item 9, `hirz decide` item 11, and Protect extraction item 32. Stored seeds
+remain unvalidated and unchanged. Runtime threat-model rows remain Planned.
+
+Final documentation review: `git diff --check` passed. A Python comparison of
+the catalog against `git show HEAD:hirz/risk/classes.yaml` confirmed all 21 old
+profiles are identical after excluding the added freshness field. Comparing
+`AGENTS.md` and `CLAUDE.md` from `## Project` onward confirmed matching bodies.
