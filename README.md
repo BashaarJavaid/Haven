@@ -242,6 +242,44 @@ Hirz/
 └── tests/{unit,integration,adversarial,scenarios,ux,latency}
 ```
 
+## Scaffold setup (Phase 0, item 1)
+
+The Python package and the `web` and `mcp-app` workspaces contain import smoke tests
+and development tooling only. There is no running application or CLI yet.
+
+Verified toolchain: Python **3.12.13**, uv **0.12.15**, Node **24.21.0**, and pnpm
+**12.4.2**. Python is selected by `.python-version`; pnpm is recorded in
+`package.json`. Direct dependencies are pinned exactly, with both lockfiles checked in.
+
+On macOS with Homebrew, install the tools and select Node 24 for this shell only
+(Homebrew installs its currently available versions):
+
+```bash
+brew install uv pnpm node@24
+export PATH="$(brew --prefix node@24)/bin:$PATH"
+```
+
+From the repository root:
+
+```bash
+uv sync --locked
+pnpm install --frozen-lockfile
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy hirz/
+pnpm -r lint
+pnpm -r typecheck
+pnpm -r test
+uv build
+```
+
+The Python test checks package import and installed metadata. Each TypeScript
+workspace tests its empty module import. Python enforces **80% line coverage**;
+the initial package has zero executable statements, so its reported 100% is
+only a tooling check, not evidence of application behavior. No cloud credentials,
+Docker services, or browser are needed for these checks.
+
 ## Quickstart (target state, see `ROADMAP.md` Phase 0)
 
 ```bash

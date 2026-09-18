@@ -53,9 +53,12 @@ This project ships the same guidance as `CLAUDE.md` (Claude Code) and `AGENTS.md
 
 ## Commands
 
-Target state; each phase adds its commands here as they become real.
+Available after Phase 0 item 1: dependency installs, Python and TypeScript smoke
+tests, lint/type checks, and `uv build`. The other commands below remain target
+state. The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
+- `uv sync --locked` / `pnpm install --frozen-lockfile` — reproduce locked dependencies; `uv build` — build the Python sdist and wheel.
 - `docker compose -f compose.dev.yml up -d` — Postgres 16 + Home Assistant (demo integration) + Hirz.
 - `uv run alembic upgrade head` — migrations.
 - `uv run hirz doctor` — local diagnostics (Postgres, HA, signing key, migrations, constitution compiles); `--aws` adds PRM, `401`, Runtime tool call, Gateway policy decision, scheduler tick.
@@ -74,7 +77,7 @@ Target state; each phase adds its commands here as they become real.
 
 ## Current phase
 
-**Phase 0 is next: nothing is built yet.** The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. A second, external critique was worked through the same day (authorization chain, visitor and scam semantics, async conversation honesty, local relock, fair backtest, derived rule preview, pause, ADR-010); it has its own `CHANGELOG.md` entry. Start with `ROADMAP.md` items 1–5. Do not pull forward Phase 1 work while scaffolding.
+**Phase 0 item 1 is complete and verified (2026-09-17); item 2 is next.** The Python package and both TypeScript workspaces have import smoke tests, lint/type checks, and locked dependencies. No application behavior is built. The architecture, threat model, constitution spec, tool catalog, twin spec, demo script, submission checklist, and ADRs are written (2026-09-15) and were revised on 2026-09-17 after a full critique against the hackathon rules (named customer and two homes, three-beat demo, rule authoring by voice, ComEd Time-of-Day rate plan, design spec, Hirz Link and signed commands, deeper Ring use, the separate open-source repository, audit anchors, hosted demo, rename); the `CHANGELOG.md` entry for that date is the summary and `ROADMAP.md` carries the new cut line. A second, external critique was worked through the same day (authorization chain, visitor and scam semantics, async conversation honesty, local relock, fair backtest, derived rule preview, pause, ADR-010); it has its own `CHANGELOG.md` entry. Continue with `ROADMAP.md` items 2–5. Do not pull forward Phase 1 work while scaffolding.
 
 ---
 

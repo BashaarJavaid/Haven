@@ -8,6 +8,15 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-17: Phase 0 item 1 verified: installable Python 3.12 `hirz` package,
+  uv lockfile, private pnpm `web` and `mcp-app` workspaces, exact dependency pins,
+  shared TypeScript/ESLint configuration, Ruff, strict mypy, and import smoke tests.
+  Replaced the empty-suite requirement with smoke checks by author approval;
+  the Python 80% line-coverage gate is active. Python: 1 passed; TypeScript:
+  1 passed per workspace. Lint, types, locked installs, package build, fresh-wheel
+  import, and deliberate test/coverage failure probes verified. Scaffold coverage
+  is 100% over zero executable statements. README setup and agent instructions
+  updated; application behavior, Compose, migrations, and CI remain unbuilt.
 - 2026-09-15: Project architecture, threat model, roadmap, constitution spec, tool
   catalog, twin and scenario spec, demo script, submission checklist, and ADRs 001–008.
   No code yet; Phase 0 is next.
