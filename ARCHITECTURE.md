@@ -379,7 +379,7 @@ Two stores with a clear split:
 
 ### 5.10 Audit Ledger
 
-Append-only Postgres table with a SHA-256 hash chain and per-row ECDSA P-256 signatures, the same design as the author's PortunusMCP gateway: `seq`, `event_type`, `payload` (canonical JSON, RFC 8785 via `canonicaljson`), `prev_hash`, `curr_hash`, `signature`, `key_fingerprint`, `created_at`. The chain pointer is updated in the same transaction as the insert (single writer, `SELECT ... FOR UPDATE` on a pointer row), which is what keeps the chain contiguous under concurrent decisions. `hirz verify-audit` walks and verifies the chain and every signature; `hirz audit export --range` produces a self-contained verifiable file. The companion app's audit view and the MCP `get_action_audit` tool read from this table and never from logs.
+Append-only Postgres table with a SHA-256 hash chain and per-row ECDSA P-256 signatures, the same design as the author's PortunusMCP gateway: `seq`, `event_type`, `payload` (canonical JSON, RFC 8785 via `canonicaljson`), `prev_hash`, `curr_hash`, `signature`, `key_fingerprint`, `created_at`. Each household has its own sequence and pointer. Its chain pointer is updated in the same transaction as the insert (one writer at a time per household, `SELECT ... FOR UPDATE` on that household's pointer row), which is what keeps the chain contiguous under concurrent decisions. `hirz verify-audit` walks and verifies the chain and every signature; `hirz audit export --range` produces a self-contained verifiable file. The companion app's audit view and the MCP `get_action_audit` tool read from this table and never from logs.
 
 **Anchoring.** The worker holds the signing key and database write access, so a compromised worker could rewrite the chain and re-sign it; the chain alone is tamper-evident only against an attacker who has the database. In AWS mode the chain head (`seq`, `curr_hash`, timestamp) is therefore written hourly, and on every `CONSTITUTION_ACTIVATED`, to an S3 bucket with Object Lock in governance mode (retention through the judging window; compliance mode would block `cdk destroy`). The worker's role has put-only access to that bucket. `hirz verify-audit --anchors` compares the chain with the anchors and detects any rewrite of history before the last anchor; each anchor is also an `AUDIT_ANCHORED` row. Local mode records "not anchored: local mode". Per-row signing stays on the local key: a KMS call per row would sit inside the audit write path and the latency budget, add a fail-closed dependency, and still sign whatever a compromised worker asked for.
 
@@ -514,6 +514,38 @@ graph LR
 
 ---
 
+### 6.1 Phase 0 foundation (approved 2026-09-17)
+
+SQLAlchemy Core (no ORM), async psycopg, and Alembic revision `0001_initial` provide
+only the five tables below. Every column is required; all foreign keys use no
+cascading deletion. UUIDs are supplied by future application callers.
+
+| Table | Initial fields and constraints |
+|---|---|
+| `households` | `id UUID` primary key; nonempty text `name`, `timezone`, `locale` |
+| `members` | `(household_id, id)` UUID primary key; household foreign key; nonempty `display_name`; `role` in `owner`, `adult`, `teen`, `child`, `guest`, `caregiver` |
+| `member_accounts` | `(household_id, provider, sub)` primary key; nonempty provider/sub text; `member_id UUID`; composite foreign key `(household_id, member_id)` to members |
+| `audit_log` | `(household_id UUID, seq bigint > 0)` primary key; household foreign key; nonempty `event_type`; object `payload JSONB`; `prev_hash`, `curr_hash`, `key_fingerprint` as 64 lowercase hex characters; nonempty `signature BYTEA`; `created_at TIMESTAMPTZ DEFAULT now()` |
+| `audit_pointer` | `household_id UUID` primary/foreign key; `seq bigint >= 0 DEFAULT 0`; `curr_hash` as 64 lowercase hex characters, default 64 zeroes |
+
+One provider/sub may link to a member in each household, but only once within that
+household. Graph tables have no extra timestamps, defaults, or indexes beyond
+keys. History columns and repositories arrive in item 6; `rate_plan`, pause, and
+demo-lifecycle fields arrive with their roadmap behavior. No seed or pointer rows
+are inserted by the migration. Item 10 will implement audit signing and pointer
+transactions: genesis is sequence zero/hash zero; signatures are DER ECDSA P-256;
+fingerprints are SHA-256 of DER SubjectPublicKeyInfo. These are format decisions,
+not implemented audit protections. Database constraints check shape, not signatures.
+
+The local initializer may create a missing key only after confirming an empty,
+consistent audit database (or a completely unmigrated database). It never replaces
+an existing malformed key or a key whose loss accompanies existing audit rows.
+The local doctor checks services, a signing probe, and migration revision/table
+presence without repairing or writing anything. Full schema drift, graph behavior,
+constitution compilation, and AWS checks are outside item 3.
+
+---
+
 ## 7. Identity and the multi-member model
 
 - **Alexa side.** Account linking yields one access token per linked Amazon account. The token's `sub` maps to a `member_accounts` row. Amazon Household profile switching on a device changes which account's token arrives, so two adults who each link get individual identity. Alexa's Voice ID is not exposed to MCP add-ons (classic Skills receive a `personId`; the add-on docs define no equivalent), so Hirz never claims to know who spoke beyond the linked account.
@@ -581,7 +613,7 @@ Things that never run inside a tool call: the MILP planner, Bedrock calls, the G
 - Household isolation: every query scoped by `household_id` derived from the token, never from a parameter; a test drives two households through the same server and asserts zero leakage.
 - Prompt-injection posture: text that arrives from Alexa (member utterances, contact names, calendar titles) is data. It is never concatenated into a Bedrock prompt as instructions; the Explainer and Protect prompts put such text in delimited data fields with schema-validated outputs; the pipeline and risk engine never consult model output for a decision.
 - Constitution and Cedar: non-Turing-complete grammar; AgentCore Policy's automated reasoning rejects always-allow and never-satisfiable policies in AWS mode; activation is journaled; rollback is a first-class path.
-- Secrets: adapter credentials only in AgentCore Identity (AWS) or `.env` (local); the audit signing key in a mounted secret; never in the graph or in payloads.
+- Secrets: adapter credentials only in AgentCore Identity (AWS) or `.env` (local); the audit signing key in a mounted secret in deployment, and in quoted multiline `AUDIT_SIGNING_KEY` inside the regular `0600` `.env` locally; never in the graph or in payloads.
 - Webhooks: HMAC-SHA256 verification and replay window on Ring events.
 - Actuation: home devices obey only KMS-signed commands (§5.17); `kms:Sign` belongs to one Lambda role; write-capable adapter credentials are readable by that role only; the worker's role is explicitly denied both. The signing Lambda recomputes the action hash, and every command is addressed to one home and executed at most once.
 - Audit: chain head anchored to S3 Object Lock, worker put-only (§5.10).

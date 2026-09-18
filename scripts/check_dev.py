@@ -14,13 +14,13 @@ import httpx
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from hirz.local import LocalError as DevError  # noqa: E402
 from scripts.init_dev import (  # noqa: E402
     DEADLINE,
     DEMO_ENTITIES,
     HA_URL,
     POLL,
     REQUEST_TIMEOUT,
-    DevError,
     check_postgres,
     compose,
     demo_entities,

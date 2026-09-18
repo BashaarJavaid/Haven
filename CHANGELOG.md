@@ -8,6 +8,19 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-17: Phase 0 item 3 verified: Alembic `0001_initial` adds five
+  foundation tables using SQLAlchemy Core and async psycopg, UUID identities,
+  household-scoped account links, and per-household audit pointers. Explicit
+  initialization preserves or creates the local P-256 key in `.env`, refusing
+  missing-key generation over audit rows, partial schema, or failed database checks.
+  Added read-only `hirz doctor`: four independent results, bounded waits, and
+  credential-safe failures. Clean source snapshot/fresh-volume doctor: four PASS;
+  Python: 36 passed, 86.13% runtime coverage; PostgreSQL integration: 4 passed.
+  Migration round trips, key/credential preservation, live negative probes,
+  lint/types, locked install, package build/fresh-wheel CLI, container liveness,
+  and authenticated HA demo checks passed. Updated architecture, ADR-002, setup,
+  and matching agent guidance. Graph history, seeds, audit writing, and application
+  behavior remain deferred; no threat-model protection status changed.
 - 2026-09-17: Phase 0 item 2 verified: localhost-only Compose with pinned
   PostgreSQL 16.15, Home Assistant 2026.9.2 demo entities, a non-root Hirz
   `/health` container, and optional Jaeger 2.21.0. Explicit initialization

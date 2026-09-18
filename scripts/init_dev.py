@@ -10,23 +10,27 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from dotenv import dotenv_values, set_key
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from dotenv import set_key
 from websockets.asyncio.client import connect
+
+# Support the documented direct command as well as pytest imports.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from hirz import local  # noqa: E402
+from hirz.db import connect_database, require_empty_audit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / ".env"
-HA_URL = "http://127.0.0.1:8123"
+HA_URL = local.HA_URL
+REQUEST_TIMEOUT = local.REQUEST_TIMEOUT
+DEMO_ENTITIES = local.DEMO_ENTITIES
+DevError = local.LocalError
 DEADLINE = 180
 POLL = 2
-REQUEST_TIMEOUT = 10
-# Unmodified entity IDs verified against HA 2026.9.2's demo platforms:
-# https://github.com/home-assistant/core/tree/2026.9.2/homeassistant/components/demo
-DEMO_ENTITIES = {
-    "light.bed_light",
-    "climate.ecobee",
-    "cover.garage_door",
-    "sensor.outside_temperature",
-}
+
 RECOVERY = (
     "HA is already onboarded without a usable saved token. Sign in at "
     "http://localhost:8123, finish any pending onboarding, create a long-lived "
@@ -35,14 +39,8 @@ RECOVERY = (
 )
 
 
-class DevError(Exception):
-    """An actionable message safe to print (never include upstream bodies)."""
-
-
 def read_env() -> dict[str, str]:
-    if ENV_FILE.is_symlink():
-        raise DevError(".env must be a regular file, not a symlink.")
-    return {k: v for k, v in dotenv_values(ENV_FILE, interpolate=False).items() if v}
+    return local.read_env(ENV_FILE)
 
 
 def prepare_env(existing_volumes: set[str]) -> dict[str, str]:
@@ -373,10 +371,40 @@ async def main() -> None:
         "homeassistant",
     )
     await check_postgres()
+    await prepare_signing_key()
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, trust_env=False) as client:
         await wait_http(client)
         await provision(client, values)
     print("Initialization complete. Run docker compose -f compose.dev.yml up -d.")
+
+
+async def prepare_signing_key() -> None:
+    values = read_env()
+    if values.get("AUDIT_SIGNING_KEY"):
+        local.signing_key(values)
+        print("PASS Signing key: reused valid local P-256 key.")
+        return
+    try:
+        async with asyncio.timeout(REQUEST_TIMEOUT):
+            async with connect_database(values) as connection:
+                await connection.run_sync(require_empty_audit)
+    except DevError:
+        raise
+    except Exception:
+        raise DevError(
+            "Cannot confirm an empty audit database; no key generated. "
+            "Check Postgres and restore the original key if one existed."
+        ) from None
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    set_key(ENV_FILE, "AUDIT_SIGNING_KEY", pem)
+    ENV_FILE.chmod(0o600)
+    local.signing_key(read_env())
+    print("PASS Signing key: created local P-256 key; empty audit confirmed.")
 
 
 if __name__ == "__main__":

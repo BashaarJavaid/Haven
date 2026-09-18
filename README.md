@@ -242,11 +242,12 @@ Hirz/
 └── tests/{unit,integration,adversarial,scenarios,ux,latency}
 ```
 
-## Scaffold setup (Phase 0, items 1–2)
+## Scaffold setup (Phase 0, items 1–3)
 
-The Python package has a liveness endpoint and local-development bootstrap checks.
-The `web` and `mcp-app` workspaces still contain import smoke tests only. There is
-no household application behavior or Hirz CLI yet.
+The Python package has a liveness endpoint, local-development bootstrap checks,
+five foundation tables managed by Alembic, and `hirz doctor`. The `web` and
+`mcp-app` workspaces still contain import smoke tests only. There is no household
+application behavior yet.
 
 Verified toolchain: Python **3.12.13**, uv **0.12.15**, Node **24.21.0**, and pnpm
 **12.4.2**. Python is selected by `.python-version`; pnpm is recorded in
@@ -268,43 +269,50 @@ pnpm install --frozen-lockfile
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy hirz/ scripts/
+uv run mypy hirz/ scripts/ alembic/
 pnpm -r lint
 pnpm -r typecheck
 pnpm -r test
 uv build
 ```
 
-Python tests cover package metadata, liveness, and bootstrap credential/protocol
-handling. Each TypeScript workspace tests its empty module import. Python enforces
-**80% line coverage over `hirz/`**; the liveness endpoint is only five executable
-statements, so 100% is not evidence of household application behavior. The bootstrap
-scripts have separate behavioral tests. No cloud credentials, Docker services, or
-browser are needed for these tests; the WebSocket test binds a temporary local port.
+Default Python tests cover package metadata, liveness, bootstrap credential/protocol
+handling, key recovery, and doctor output/failures. Each TypeScript workspace tests
+its empty module import. Python enforces **80% line coverage over `hirz/`**; scaffold
+coverage is not evidence of household application behavior. No cloud credentials,
+Docker services, or browser are needed for default tests; the WebSocket test binds
+a temporary local port. Live database tests are selected explicitly below.
 
-## Local development stack (Phase 0, item 2)
+## Local development stack (Phase 0, items 2–3)
 
 Start Docker before running these commands from the repository root:
 
 ```bash
 uv sync --locked
 uv run python scripts/init_dev.py
-docker compose -f compose.dev.yml up -d
+docker compose -f compose.dev.yml up -d --build
+uv run alembic upgrade head
+uv run hirz doctor
 uv run python scripts/check_dev.py
 ```
 
 The initializer creates missing local credentials in ignored `.env` (mode `0600`),
 starts Postgres and Home Assistant, completes HA onboarding, and saves a 365-day
-long-lived token. It preserves existing credentials and unrelated `.env` entries;
+long-lived token. It also creates an unencrypted PKCS#8 P-256 private key as a
+quoted multiline `AUDIT_SIGNING_KEY`, only after confirming an empty audit database.
+It preserves existing credentials, valid keys, and unrelated `.env` entries;
 rerunning it reuses a valid token. Do not run initializers concurrently. Initial
 image downloads can take several minutes; readiness waits are bounded to 180 seconds.
-Use `.env` for these credentials, not competing shell environment variables.
+Use a regular, nonsymlink `.env` with mode `0600` for these credentials, not competing
+shell environment variables. Commands run from the checkout root; the database/user
+are `hirz` at `127.0.0.1:5432`, and HA is at `http://127.0.0.1:8123`. Endpoint
+configuration for deployment is deferred.
 
 | Service | Address | What exists now |
 |---|---|---|
 | Hirz | <http://localhost:8000/health> | `200 {"status":"ok"}`; process liveness only |
 | Home Assistant | <http://localhost:8123> | Real API, demo devices (**simulated**) |
-| PostgreSQL | `localhost:5432` | Database/user `hirz`; no application schema yet |
+| PostgreSQL | `localhost:5432` | Database/user `hirz`; five foundation tables after migration |
 | Jaeger, optional | <http://localhost:16686> | In-memory traces; no Hirz instrumentation yet |
 
 All published ports bind to `127.0.0.1`. Hirz has no `/ready`, MCP, API docs, worker,
@@ -365,6 +373,39 @@ for existing volumes require restoring the original `.env`; changing the Postgre
 environment variable does not change a persisted database password. Inspect service
 status with `docker compose -f compose.dev.yml ps`; do not publish `.env`, rendered
 Compose configuration, or container inspection output containing credentials.
+
+**Local diagnostics and migrations:** `uv run hirz doctor` prints four named
+PASS/FAIL lines for password-authenticated Postgres, HA demo entities, an in-memory
+P-256 sign/verify probe, and migration currency plus the presence of all five tables.
+Each check has a ten-second deadline and no retry. All checks run; exit status is
+0 only if every check passes, otherwise 1. It performs no repairs, migrations,
+audit writes, or device actions. It does not check full schema drift, constitution
+compilation, or AWS yet. There is no `--json` or `--aws` mode in item 3.
+
+Apply migrations explicitly with `uv run alembic upgrade head`; neither the server
+nor initialization applies them. `uv run alembic check` compares the schema with
+Core metadata for Alembic-supported differences. **`uv run alembic downgrade base`
+destroys all five foundation tables and their data**; use it only on disposable data.
+The initial migration inserts no seed or audit rows. Graph history, repositories,
+seeds, and audit-chain execution belong to later roadmap items.
+
+**Signing-key recovery:** back up `.env` privately. Missing keys are generated only
+for a completely unmigrated database or a consistent migrated schema with no audit
+rows. Any audit rows, partial schema, or database-check failure blocks creation.
+Malformed, encrypted, or wrong-curve keys fail without replacement. Restore the
+original key and resolve database problems; never delete audit data to make setup
+pass. Local private-key material stays in `.env`, never in the liveness container.
+
+With the local database running, explicitly run its integration tests:
+
+```bash
+uv run pytest -m integration --no-cov
+```
+
+These tests use the `.env` database credentials to create uniquely named
+`hirz_test_*` databases, exercise migrations and constraints with synthetic schema
+fixtures, and drop only those databases afterward. Default `uv run pytest` excludes
+them and retains the 80% coverage gate. No fixture executes a household action.
 
 **Destructive reset, only when intentionally discarding this demo's data:**
 

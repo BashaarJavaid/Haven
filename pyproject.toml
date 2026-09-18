@@ -6,9 +6,18 @@ requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
+    "alembic==1.20.0",
+    "cryptography==50.0.1",
     "fastapi==0.141.1",
+    "httpx==0.28.1",
+    "psycopg[binary]==3.3.5",
+    "python-dotenv==1.2.3",
+    "sqlalchemy[asyncio]==2.0.54",
     "uvicorn==0.53.0",
 ]
+
+[project.scripts]
+hirz = "hirz.cli:main"
 
 [build-system]
 requires = ["uv_build==0.12.15"]
@@ -27,19 +36,18 @@ select = ["E4", "E7", "E9", "F", "I"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["hirz", "scripts"]
+files = ["hirz", "scripts", "alembic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=hirz --cov-report=term-missing --cov-fail-under=80"
+addopts = "-m 'not integration' --cov=hirz --cov-report=term-missing --cov-fail-under=80"
+markers = ["integration: requires local Postgres; creates only a disposable test database"]
 
 [dependency-groups]
 dev = [
-    "httpx==0.28.1",
     "mypy==2.3.1",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
-    "python-dotenv==1.2.3",
     "ruff==0.16.8",
     "websockets==17.1",
 ]
