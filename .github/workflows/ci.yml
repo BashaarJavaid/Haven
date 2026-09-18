@@ -1,0 +1,197 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  python-lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+
+  python-types:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run --locked mypy --strict hirz/ scripts/ alembic/
+
+  python-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: hirz-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      HIRZ_LLM: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install
+      - run: uv sync --locked
+      - name: Service-free tests and 80 percent coverage gate
+        run: uv run --locked pytest
+      - name: Initialize disposable PostgreSQL and Home Assistant demo
+        run: uv run --locked python scripts/init_dev.py
+      - name: Build and start Hirz with readiness checks
+        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 180
+      - run: uv run --locked alembic upgrade head
+      - run: uv run --locked alembic check
+      - run: uv run --locked hirz doctor
+      - run: uv run --locked python scripts/check_dev.py
+      - name: Live PostgreSQL tests in disposable databases
+        run: uv run --locked pytest -m integration --no-cov
+      - name: Service status on failure (no configuration or raw logs)
+        if: failure()
+        run: >-
+          docker ps -a
+          --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME"
+          --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+      - name: Remove only this runner's Compose resources and credentials
+        if: always()
+        run: |
+          trap 'rm -f .env' EXIT
+          if [ -f .env ]; then
+            docker compose -f compose.dev.yml down --volumes --remove-orphans
+          fi
+
+  scenarios:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Phase 0 placeholder — scenarios not implemented
+        run: |
+          echo 'DEFERRED: No scenario assertions ran. Items 16, 22, and 35 add the runner and scenario corpus.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  ts-lint-types:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+          package-manager-cache: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: false
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r lint
+      - run: pnpm -r typecheck
+
+  ts-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+          package-manager-cache: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: false
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r test
+      - name: Browser coverage awaits Phase 5
+        run: |
+          echo 'DEFERRED: No Playwright, companion, simulator, or voice-only checks ran. Phase 5 adds these surfaces and browser tests.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Phase 0 placeholder — add-on checker not implemented
+        run: |
+          echo 'DEFERRED: No add-on contract checks ran. Item 25a adds the separate conformance checker against the local MCP server.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  latency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Phase 0 placeholder — MCP latency suite not implemented
+        run: |
+          echo 'DEFERRED: No latency budget was measured or enforced. Phase 4 adds MCP tool checks; item 38 adds AWS latency and cold-start measurements.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  cedar-conform:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Phase 0 placeholder — policy evaluators not implemented
+        run: |
+          echo 'DEFERRED: No boundary or compiler agreement was tested. Item 7 adds local Dogwood and property-based conformance; item 37 adds AgentCore comparison.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv build
+      - name: Fresh-wheel import and CLI outside the checkout
+        run: |
+          wheel=$(realpath dist/*.whl)
+          uv venv "$RUNNER_TEMP/wheel-smoke"
+          uv pip install --python "$RUNNER_TEMP/wheel-smoke/bin/python" "$wheel"
+          cd "$RUNNER_TEMP"
+          ./wheel-smoke/bin/python -c 'import hirz; from importlib.metadata import version; print("PASS installed hirz", version("hirz"))'
+          ./wheel-smoke/bin/hirz --help
+      - run: docker build --tag hirz-ci:check .
+      - name: Container runs as the existing unprivileged user
+        run: docker run --rm --entrypoint python hirz-ci:check -c 'import os; assert os.getuid() == 10001; print("PASS container UID", os.getuid())'
+      - name: Frontend bundles await Phase 5
+        run: |
+          echo 'DEFERRED: No MCP App or companion bundle was built. Phase 5 adds the frontend build scripts.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Phase 0 placeholder — publishing not configured
+        run: |
+          echo 'DEFERRED: No release was published and no CDK artifact was synthesized. Phase 7 adds tag-gated ECR publication and CDK synthesis; this placeholder runs on every event.' | tee -a "$GITHUB_STEP_SUMMARY"

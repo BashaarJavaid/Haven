@@ -8,6 +8,52 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-17: Phase 0 item 4 implemented, pending green CI on `main`: all
+  eleven GitHub Actions jobs, pinned tools/actions, read-only repository access,
+  existing Python/TypeScript checks, disposable Compose integration checks,
+  package/fresh-wheel and non-root container checks. Future scenario, conformance,
+  latency, Cedar, and release jobs are explicit successful placeholders; browser
+  tests and frontend bundles are also deferred. No AWS publication or new
+  application guarantees. The author merges the items 1–4 PR before main
+  verification and a follow-up completion-documentation PR.
+  Local verification: Python 36 passed, 86.13% coverage; PostgreSQL integration
+  4 passed; one Vitest test per workspace; lint/types, package/fresh-wheel,
+  isolated Compose service checks, schema drift, doctor, and container UID passed.
+- 2026-09-17: Phase 0 item 3 verified: Alembic `0001_initial` adds five
+  foundation tables using SQLAlchemy Core and async psycopg, UUID identities,
+  household-scoped account links, and per-household audit pointers. Explicit
+  initialization preserves or creates the local P-256 key in `.env`, refusing
+  missing-key generation over audit rows, partial schema, or failed database checks.
+  Added read-only `hirz doctor`: four independent results, bounded waits, and
+  credential-safe failures. Clean source snapshot/fresh-volume doctor: four PASS;
+  Python: 36 passed, 86.13% runtime coverage; PostgreSQL integration: 4 passed.
+  Migration round trips, key/credential preservation, live negative probes,
+  lint/types, locked install, package build/fresh-wheel CLI, container liveness,
+  and authenticated HA demo checks passed. Updated architecture, ADR-002, setup,
+  and matching agent guidance. Graph history, seeds, audit writing, and application
+  behavior remain deferred; no threat-model protection status changed.
+- 2026-09-17: Phase 0 item 2 verified: localhost-only Compose with pinned
+  PostgreSQL 16.15, Home Assistant 2026.9.2 demo entities, a non-root Hirz
+  `/health` container, and optional Jaeger 2.21.0. Explicit initialization
+  provisions local passwords and an HA token into ignored `.env`; reruns reuse
+  credentials and inconsistent state fails without resetting data. Added live
+  checks, recovery/reset instructions, and bootstrap tests. Python: 19 passed;
+  Ruff, strict mypy, locked sync, and package build passed. Authenticated HA curl
+  returned 123 entities; isolated checks proved credential failure handling,
+  database/HA persistence across down/up, and disposable Jaeger trace retrieval.
+  Runtime coverage is 100% over five statements, not a household guarantee.
+  Verified on macOS ARM64 with Docker Desktop 4.87.0; upstream HA does not support
+  Docker Desktop for its general Container installation. No physical-device
+  support, MCP, worker, application schema, or readiness endpoint is claimed.
+- 2026-09-17: Phase 0 item 1 verified: installable Python 3.12 `hirz` package,
+  uv lockfile, private pnpm `web` and `mcp-app` workspaces, exact dependency pins,
+  shared TypeScript/ESLint configuration, Ruff, strict mypy, and import smoke tests.
+  Replaced the empty-suite requirement with smoke checks by author approval;
+  the Python 80% line-coverage gate is active. Python: 1 passed; TypeScript:
+  1 passed per workspace. Lint, types, locked installs, package build, fresh-wheel
+  import, and deliberate test/coverage failure probes verified. Scaffold coverage
+  is 100% over zero executable statements. README setup and agent instructions
+  updated; application behavior, Compose, migrations, and CI remain unbuilt.
 - 2026-09-15: Project architecture, threat model, roadmap, constitution spec, tool
   catalog, twin and scenario spec, demo script, submission checklist, and ADRs 001–008.
   No code yet; Phase 0 is next.

@@ -1,0 +1,15 @@
+# Real Home Assistant API, simulated demo devices. No physical devices configured.
+homeassistant:
+  name: Hirz Demo
+  time_zone: America/Chicago
+  unit_system: us_customary
+  country: US
+
+frontend:
+api:
+websocket_api:
+onboarding:
+demo:
+
+# Native onboarding loads its own dependencies and optional integrations.
+# Analytics sharing is opt-in; the initializer never enables it.

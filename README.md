@@ -242,11 +242,208 @@ Hirz/
 └── tests/{unit,integration,adversarial,scenarios,ux,latency}
 ```
 
+## Scaffold setup (Phase 0, items 1–3)
+
+The Python package has a liveness endpoint, local-development bootstrap checks,
+five foundation tables managed by Alembic, and `hirz doctor`. The `web` and
+`mcp-app` workspaces still contain import smoke tests only. There is no household
+application behavior yet.
+
+Verified toolchain: Python **3.12.13**, uv **0.12.15**, Node **24.21.0**, and pnpm
+**12.4.2**. Python is selected by `.python-version`; pnpm is recorded in
+`package.json`. Direct dependencies are pinned exactly, with both lockfiles checked in.
+
+On macOS with Homebrew, install the tools and select Node 24 for this shell only
+(Homebrew installs its currently available versions):
+
+```bash
+brew install uv pnpm node@24
+export PATH="$(brew --prefix node@24)/bin:$PATH"
+```
+
+From the repository root:
+
+```bash
+uv sync --locked
+pnpm install --frozen-lockfile
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy hirz/ scripts/ alembic/
+pnpm -r lint
+pnpm -r typecheck
+pnpm -r test
+uv build
+```
+
+Default Python tests cover package metadata, liveness, bootstrap credential/protocol
+handling, key recovery, and doctor output/failures. Each TypeScript workspace tests
+its empty module import. Python enforces **80% line coverage over `hirz/`**; scaffold
+coverage is not evidence of household application behavior. No cloud credentials,
+Docker services, or browser are needed for default tests; the WebSocket test binds
+a temporary local port. Live database tests are selected explicitly below.
+
+## Continuous integration (Phase 0, item 4)
+
+The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
+manual dispatch using Ubuntu 24.04 x64 and the pinned toolchain above. It runs
+Python lint/types/tests with the 80% coverage gate, TypeScript lint/types/Vitest,
+Python package and fresh-wheel checks, and Docker build/non-root checks.
+The Python test job initializes an isolated Compose stack and runs migrations,
+`alembic check`, doctor, authenticated service checks, and the live PostgreSQL
+tests. Generated credentials stay in the runner's ignored `.env`; cleanup removes
+only that run's containers, volumes, and credentials.
+
+All eleven architecture job IDs are present. Scenarios, add-on conformance,
+latency, Cedar conformance, and release are **successful placeholders** with
+explicit deferral messages in their logs and job summaries. Browser tests and
+frontend bundles are also deferred. No AWS secrets or publication are involved.
+There are no cross-run dependency/Docker caches or artifact uploads.
+
+On GitHub, open **Actions → CI → Run workflow** for manual dispatch after the
+workflow reaches `main`. Item 4 remains pending until a green `main` run is
+verified; green placeholders do not claim application behavior or protection.
+
+## Local development stack (Phase 0, items 2–3)
+
+Start Docker before running these commands from the repository root:
+
+```bash
+uv sync --locked
+uv run python scripts/init_dev.py
+docker compose -f compose.dev.yml up -d --build
+uv run alembic upgrade head
+uv run hirz doctor
+uv run python scripts/check_dev.py
+```
+
+The initializer creates missing local credentials in ignored `.env` (mode `0600`),
+starts Postgres and Home Assistant, completes HA onboarding, and saves a 365-day
+long-lived token. It also creates an unencrypted PKCS#8 P-256 private key as a
+quoted multiline `AUDIT_SIGNING_KEY`, only after confirming an empty audit database.
+It preserves existing credentials, valid keys, and unrelated `.env` entries;
+rerunning it reuses a valid token. Do not run initializers concurrently. Initial
+image downloads can take several minutes; readiness waits are bounded to 180 seconds.
+Use a regular, nonsymlink `.env` with mode `0600` for these credentials, not competing
+shell environment variables. Commands run from the checkout root; the database/user
+are `hirz` at `127.0.0.1:5432`, and HA is at `http://127.0.0.1:8123`. Endpoint
+configuration for deployment is deferred.
+
+| Service | Address | What exists now |
+|---|---|---|
+| Hirz | <http://localhost:8000/health> | `200 {"status":"ok"}`; process liveness only |
+| Home Assistant | <http://localhost:8123> | Real API, demo devices (**simulated**) |
+| PostgreSQL | `localhost:5432` | Database/user `hirz`; five foundation tables after migration |
+| Jaeger, optional | <http://localhost:16686> | In-memory traces; no Hirz instrumentation yet |
+
+All published ports bind to `127.0.0.1`. Hirz has no `/ready`, MCP, API docs, worker,
+or companion pages yet. Its runtime contains no device credentials. The development
+container sets `HIRZ_LLM=off` and needs no AWS account. HA uses “Hirz Demo,” English,
+`America/Chicago`, US customary units, username `hirz`, and display name “Hirz Developer.”
+Retrieve the generated password privately from `.env` to sign into HA.
+
+HA's unmodified demo integration supplies the entities; the checker requires
+`climate.ecobee`, `cover.garage_door`, `light.bed_light`, and
+`sensor.outside_temperature`. Native onboarding also initializes `google_translate`,
+`met`, `radio_browser`, and `shopping_list`, plus frontend dependencies. Analytics
+sharing stays off. These are demo infrastructure, not household actions; neither
+script calls device services or substitutes for the future decision pipeline.
+
+HA's [installation guide](https://www.home-assistant.io/installation/linux/)
+excludes Docker Desktop from its supported Container setup. This demo-only stack
+passed on macOS ARM64 with Docker Desktop **4.87.0**, Engine **29.7.2**, and Compose
+**5.4.0** on **2026-09-17**; it does not establish physical-device support.
+If it fails on your runtime, retain the volumes and investigate before switching
+runtimes. No host networking, privileged mode, or physical-device mounts are used.
+
+For the roadmap's direct authenticated API check, pass the header through stdin
+so the token is absent from curl's command-line arguments:
+
+```bash
+uv run python -c 'from dotenv import dotenv_values; print("Authorization: Bearer " + dotenv_values(".env", interpolate=False)["HA_TOKEN"])' \
+  | curl --fail --silent --show-error --header @- http://localhost:8123/api/states
+```
+
+The response contains demo entities. Without that header, HA returns `401`.
+`check_dev.py` additionally checks a password-authenticated Postgres query and Hirz
+liveness; it prints entity IDs and results, never credentials.
+
+```bash
+# Rebuild after Python source/dependency changes; no source mount or reload watcher.
+docker compose -f compose.dev.yml up -d --build
+
+# Optional Jaeger; OTLP ports 4317/4318 remain internal to Compose.
+docker compose -f compose.dev.yml --profile observability up -d
+uv run python scripts/check_dev.py --observability
+
+# Stop all services, retaining Postgres and HA named volumes and .env.
+docker compose -f compose.dev.yml --profile observability down
+```
+
+The observability check submits one disposable `hirz-dev-check` trace from inside
+the Compose network and retrieves it by ID. Jaeger stores traces in memory and
+loses them on restart. No tracing SDK is installed in Hirz.
+
+**Recovery:** if HA is already onboarded and `HA_TOKEN` is absent, invalid, or
+expired, sign into HA with the original credentials, finish any pending onboarding,
+then create a replacement under **Profile → Security → Long-lived access tokens**.
+Revoke an obsolete “Hirz local development” token before reusing its name. Save the
+replacement as `HA_TOKEN` in `.env` and rerun initialization. The script does not
+automatically sign in again or edit HA authentication storage. Missing credentials
+for existing volumes require restoring the original `.env`; changing the Postgres
+environment variable does not change a persisted database password. Inspect service
+status with `docker compose -f compose.dev.yml ps`; do not publish `.env`, rendered
+Compose configuration, or container inspection output containing credentials.
+
+**Local diagnostics and migrations:** `uv run hirz doctor` prints four named
+PASS/FAIL lines for password-authenticated Postgres, HA demo entities, an in-memory
+P-256 sign/verify probe, and migration currency plus the presence of all five tables.
+Each check has a ten-second deadline and no retry. All checks run; exit status is
+0 only if every check passes, otherwise 1. It performs no repairs, migrations,
+audit writes, or device actions. It does not check full schema drift, constitution
+compilation, or AWS yet. There is no `--json` or `--aws` mode in item 3.
+
+Apply migrations explicitly with `uv run alembic upgrade head`; neither the server
+nor initialization applies them. `uv run alembic check` compares the schema with
+Core metadata for Alembic-supported differences. **`uv run alembic downgrade base`
+destroys all five foundation tables and their data**; use it only on disposable data.
+The initial migration inserts no seed or audit rows. Graph history, repositories,
+seeds, and audit-chain execution belong to later roadmap items.
+
+**Signing-key recovery:** back up `.env` privately. Missing keys are generated only
+for a completely unmigrated database or a consistent migrated schema with no audit
+rows. Any audit rows, partial schema, or database-check failure blocks creation.
+Malformed, encrypted, or wrong-curve keys fail without replacement. Restore the
+original key and resolve database problems; never delete audit data to make setup
+pass. Local private-key material stays in `.env`, never in the liveness container.
+
+With the local database running, explicitly run its integration tests:
+
+```bash
+uv run pytest -m integration --no-cov
+```
+
+These tests use the `.env` database credentials to create uniquely named
+`hirz_test_*` databases, exercise migrations and constraints with synthetic schema
+fixtures, and drop only those databases afterward. Default `uv run pytest` excludes
+them and retains the 80% coverage gate. No fixture executes a household action.
+
+**Destructive reset, only when intentionally discarding this demo's data:**
+
+```bash
+docker compose -f compose.dev.yml --profile observability down --volumes
+```
+
+This deletes both the database and HA state. Remove only `HA_TOKEN` from `.env`
+(preserving unrelated entries), then rerun the first-start commands. Ordinary
+shutdown uses `down` without `--volumes`. Never use this reset to recover a token.
+
 ## Quickstart (target state, see `ROADMAP.md` Phase 0)
 
 ```bash
 git clone https://github.com/BashaarJavaid/Hirz && cd Hirz
-cp .env.example .env
+uv sync --locked
+uv run python scripts/init_dev.py
 docker compose -f compose.dev.yml up -d          # Postgres 16 + Home Assistant (demo devices) + Hirz
 uv sync && uv run alembic upgrade head
 uv run hirz scenario run scenarios/demo-evening.yaml --speed 60   # the whole evening in 3 minutes

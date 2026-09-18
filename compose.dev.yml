@@ -1,0 +1,67 @@
+name: hirz
+
+services:
+  postgres:
+    image: postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    environment:
+      POSTGRES_DB: hirz
+      POSTGRES_USER: hirz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run uv run python scripts/init_dev.py first}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hirz", "-d", "hirz"]
+      interval: 2s
+      timeout: 10s
+      retries: 90
+    restart: unless-stopped
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.9.2@sha256:a1bc133af84ee6505fe2c266d9805b7c75b780dfdc188edfee3b11e8f3cd8efe
+    environment:
+      TZ: America/Chicago
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - homeassistant:/config
+      - ./config/homeassistant/configuration.yaml:/config/configuration.yaml:ro
+    healthcheck:
+      # HTTP liveness only. check_dev.py verifies authenticated demo entities.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/', timeout=10)"]
+      interval: 2s
+      timeout: 10s
+      retries: 90
+    restart: unless-stopped
+
+  hirz:
+    build: .
+    environment:
+      HIRZ_LLM: "off"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      homeassistant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=10)"]
+      interval: 2s
+      timeout: 10s
+      retries: 90
+    restart: unless-stopped
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:16686:16686"
+    # The standard v2 all-in-one uses memory; OTLP 4317/4318 stay internal.
+    restart: unless-stopped
+
+volumes:
+  postgres:
+  homeassistant:
