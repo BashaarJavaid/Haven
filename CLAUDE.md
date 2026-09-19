@@ -173,6 +173,7 @@ For multi-step tasks, state a brief plan:
 
 The author's second standing instruction: **after building a feature, run and verify it, and report what you saw.** Concretely:
 - Run the relevant tests and paste the summary line (passed/failed/coverage).
+- Run the format check last, after the evidence log is written, because ruff formats fenced Python in Markdown.
 - Run the feature the way a user would: the CLI command, the scenario, the tool through MCP Inspector or the client SDK, the page in the browser via Playwright or a screenshot. Paste the output or describe exactly what rendered.
 - If something could not be verified (no AWS credentials, no Bedrock access, a service down), say so first and plainly, and mark the item as not done in `ROADMAP.md`.
 - Never write "should work", "is now complete", or tick a roadmap item on the strength of code alone.
