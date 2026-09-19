@@ -8,6 +8,10 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- 2026-09-18: Quantized graph numeric policy facts to four decimal places before
+  strict Cedar range validation, preserving float storage and observation no-ops;
+  [verification](./docs/verification-log.md#graph-policy-fact-quantization--2026-09-18).
+
 - 2026-09-18: Missing HVAC baselines skip deviation scoring without weakening
   other required facts ([ADR-004 amendment](./docs/adr/ADR-004-no-ml-risk-scoring.md#missing-hvac-baseline-amendment--2026-09-18-author-approved));
   pipeline and boundary failure logs include the exception class without payloads
@@ -24,6 +28,12 @@ All notable changes are documented here. The format follows
   to include item 9's pause/resume actions; [verification](./docs/verification-log.md#item-9-ci-build-check--2026-09-18).
 
 ### Added
+
+- 2026-09-18: Recorded plan-approver authority for scheduled actions and autonomous
+  re-plans, with an execution prohibition for unapproved plans;
+  [author-approved ADR-005 amendment](./docs/adr/ADR-005-deterministic-planner.md#scheduled-action-authority-amendment--2026-09-18-author-approved).
+- 2026-09-18: Extended [roadmap item 12](./ROADMAP.md) with graph homes for Phase 2
+  facts and the requirement to translate CLI evidence into in-memory observations.
 
 - 2026-09-18: Item 11's read-only `hirz decide` CLI previews stored, unactivated
   policies using the existing pipeline, explicit hypothetical identity/target

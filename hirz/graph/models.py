@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from pydantic import (
     AwareDatetime,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     JsonValue,
@@ -15,6 +16,18 @@ from pydantic import (
     model_validator,
 )
 
+from hirz.constitution.conditions import number
+
+
+def policy_number(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("Policy fact must be numeric")
+    rounded = round(value, 4)
+    number(rounded)
+    return float(rounded)
+
+
+PolicyNumber = Annotated[float, BeforeValidator(policy_number)]
 Text = Annotated[str, Field(min_length=1)]
 Source = Literal["real", "real API, demo devices", "twin"]
 Role = Literal["owner", "adult", "teen", "child", "guest", "caregiver"]
@@ -144,7 +157,7 @@ class AssetBinding(Entity):
 
 class AssetPolicy(Entity):
     asset_id: UUID
-    soc_min: float | None = Field(default=None, ge=0, le=1)
+    soc_min: PolicyNumber | None = Field(default=None, ge=0, le=1)
     needed_by: AwareDatetime | None = None
 
 
@@ -192,18 +205,16 @@ class Preference(Entity):
 
     @model_validator(mode="after")
     def temperature(self) -> Self:
-        if self.key == "temperature_target_f" and (
-            isinstance(self.value, bool) or not isinstance(self.value, (int, float))
-        ):
-            raise ValueError("Temperature preference must be numeric")
+        if self.key == "temperature_target_f":
+            object.__setattr__(self, "value", policy_number(self.value))
         return self
 
 
 class ObservationState(Model):
-    soc: float | None = Field(default=None, ge=0, le=1)
-    temp_f: float | None = None
-    target_f: float | None = None
-    power_kw: float | None = None
+    soc: PolicyNumber | None = Field(default=None, ge=0, le=1)
+    temp_f: PolicyNumber | None = None
+    target_f: PolicyNumber | None = None
+    power_kw: PolicyNumber | None = None
     present: bool | None = None
     sleeping: bool | None = None
     zone_id: UUID | None = None

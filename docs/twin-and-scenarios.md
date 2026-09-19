@@ -196,6 +196,8 @@ Scenario runs are recorded (`scenario_runs`) with the seed, the adapter mix, and
 
 ## 5. Labeling
 
+Twin observation outputs used as numeric policy facts are quantized to four decimal places on write by graph validation, the same as real observations.
+
 Every observation carries `source`, one of three values. `real`: a live feed or a physical device (Open-Meteo, the ComEd hourly feed, the smart plug through Home Assistant, Smartcar, Ring sandbox events). `real API, demo devices`: Home Assistant's demo integration, a real API over simulated entities, never shown as plain `real`. `twin`: Hirz's own models. A published rate table is `real (published ComEd rate)`: real prices, not a live feed.
 
 Cards show two visual states so a judge or a household can read them at a glance (`docs/design.md`): **live** (`real`) and **simulated** (`twin` and `real API, demo devices`, the more conservative reading). The full three-way source stays on every observation in the data, in the companion app's detail view, in the audit trail, and in the MCP `get_household_context` output (`data.sources`). The demo video shows the badges; honesty here is a scoring asset, not a liability.

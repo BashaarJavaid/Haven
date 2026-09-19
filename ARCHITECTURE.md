@@ -174,7 +174,9 @@ Whole latest observations are selected without backfilling missing fields; confl
 simultaneous observations fail closed. Occupancy completeness is required to conclude
 absence or no sleeping occupants. Only an unambiguous linked requester's temperature
 preference is a baseline. Scoped, timestamped, source-labeled supplemental evidence
-supplies absent facts and cannot contradict graph facts. Ages and source labels for
+supplies absent facts and cannot contradict graph facts.
+[Roadmap item 12](./ROADMAP.md) will define graph homes so `extract()` derives real-household facts (one presence observation per member → occupancy completeness/guests, dropping the completeness flag; doorbell `last_press_at` against `schedule_events` → unexpected visitor; doorbell `available` → online; `Asset.room_kind` → bedroom; tariff adapter household-subject observation → price band; deterministic Protect `scam_pattern` remains caller input), with `hirz decide --evidence` translating evidence into those in-memory observations.
+Ages and source labels for
 used observations are retained in the hashed context; governance needs no observations.
 
 Approval TTL begins at ASK creation and repeated calls/votes never extend it.
@@ -382,7 +384,7 @@ Item 6 exposes `people`, `member` (UUID required), `energy`, `environment`, and 
 
 The last successful current snapshot is cached per household in one service instance. `allow_stale=True` is for read-only callers only: availability failures may return that snapshot with recomputed age and stale status. No cache, historical reads, invalid inputs, missing entities, and malformed database data fail; no disk/shared cache exists. Default callers fail closed. Scalar/state freshness thresholds remain the risk engine's responsibility.
 
-**Item 6 storage.** People/trust, assets/bindings/policies, schedules/events/routines, preferences and observations have typed models in `hirz/graph/models.py`, structural columns and household-scoped foreign keys, plus validated JSONB attributes. Presence comes from observations, preferences from their own rows, and contact-method availability from channel summaries. The policy reference lives on the household; unvalidated seeded versions are unusable for decisions. Passkeys and runtime activation are not implemented here. The approved bootstrap exception and rejected alternatives are recorded in ADR-002.
+**Item 6 storage.** People/trust, assets/bindings/policies, schedules/events/routines, preferences and observations have typed models in `hirz/graph/models.py`, structural columns and household-scoped foreign keys, plus validated JSONB attributes. Presence comes from observations, preferences from their own rows, and contact-method availability from channel summaries. The policy reference lives on the household; unvalidated seeded versions are unusable for decisions. Passkeys and runtime activation are not implemented here. The approved bootstrap exception and rejected alternatives are recorded in ADR-002. Numeric policy facts are quantized to four decimal places at graph validation so the evaluator and the boundary see identical values.
 
 ### 5.2 Constitution Engine
 
@@ -528,6 +530,8 @@ Turns member requests and household facts into constraints and detects conflicts
 - **Multi-member truth.** The Coordinator never merges two members' constraints into one; each keeps its owner, so "Dad: the kitchen is busy until 11" is attributable, to an account, in the audit trail and the plan explanation.
 
 ### 5.6 Executor and Scheduler
+
+A scheduled action carries `requested_by` of its plan approver with `surface: scheduler`, autonomous re-plans inherit the superseded plan's approver, and a plan without an approver never executes; scheduled actions never run as unknown or a synthetic system identity ([author-approved amendment](./docs/adr/ADR-005-deterministic-planner.md#scheduled-action-authority-amendment--2026-09-18-author-approved)).
 
 - **Action lifecycle.** `proposed → decided → (approval pending → approved) → scheduled → executing → verified | failed → (rolled_back)`. Each transition is an audit row.
 - **Idempotency.** Every adapter call carries `action_id`; adapters treat repeats as no-ops and return the observed state. Re-delivery from the scheduler is safe.

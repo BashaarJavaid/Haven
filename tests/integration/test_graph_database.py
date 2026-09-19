@@ -179,7 +179,7 @@ def test_past_reads_updates_and_observations(scratch_database):
                 member_id=mom.id,
                 observed_at=AT,
                 source="twin",
-                state={"present": True},
+                state={"present": True, "soc": 0.30000000000000004},
             )
             async with repo.write(lambda: one):
                 await repo.put(
@@ -197,6 +197,7 @@ def test_past_reads_updates_and_observations(scratch_database):
             assert before.data["members"][0:] != boundary.data["members"][0:]
             assert not before.data["observations"]
             assert boundary.data["observations"][0]["staleness_seconds"] == 60
+            assert boundary.data["observations"][0]["state"]["soc"] == 0.3
             current = await service.get_household_context(HOME.household_id)
             assert current.data["observations"][0]["staleness_seconds"] == 120
             historical_row = await repo.get(
@@ -206,7 +207,12 @@ def test_past_reads_updates_and_observations(scratch_database):
             await connection.rollback()
             async with repo.write(lambda: two):
                 assert not await repo.put(
-                    "observations", observation, expected_version=one
+                    "observations",
+                    Observation.model_validate(
+                        observation.model_dump()
+                        | {"state": {"present": True, "soc": 0.3}}
+                    ),
+                    expected_version=one,
                 )
                 await repo.put(
                     "observations",

@@ -158,6 +158,64 @@ observation history retain their approved limits. All threat-model rows remain
 unchanged. The local database remains migrated and seeded, and the development
 stack remains running. Friction-log review found no new entry to add.
 
+### Graph policy-fact quantization — 2026-09-18
+
+Task 1 follow-up on branch `phase-1`, macOS, Python 3.12.13, pytest 9.1.1,
+Hypothesis 6.168.0. Numeric policy facts remain floats: graph validation rounds
+with `round(value, 4)` and then checks the unchanged strict policy `number()`.
+The shared validator covers observation `soc`, `temp_f`, `target_f`, `power_kw`,
+asset-policy `soc_min`, and only temperature preferences. Physical parameters,
+location, and confidence retain their existing validation.
+
+Commands below used `UV_CACHE_DIR=/private/tmp/hirz-uv-cache`; the fresh import
+used `PATH="$PWD/.venv/bin:$PATH"` to select the project interpreter. Both pytest
+commands ran with authorized local socket/database access; integration fixtures
+created and removed uniquely named disposable databases.
+
+| Command | Output |
+|---|---|
+| `python -c "import hirz.graph.models"` | Exit 0, no output; fresh interpreter confirms no import cycle |
+| `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/ scripts/ alembic/` | `All checks passed!`; `84 files already formatted`; `Success: no issues found in 40 source files` |
+| `uv run pytest` | `572 passed, 47 deselected in 58.41s`; `Required test coverage of 80% reached. Total coverage: 86.68%` (3002 statements, 400 missed); graph models: 100% |
+| `uv run pytest -m integration --no-cov` | `47 passed, 572 deselected in 31.67s` |
+| `git diff --check` | Exit 0, no whitespace errors |
+
+Direct model/policy probe, run with `uv run python -`:
+
+```python
+from hirz.graph.models import ObservationState
+from hirz.constitution.conditions import attribute
+state = ObservationState(soc=0.1 + 0.2, temp_f=71.123456)
+print(state.model_dump_json(exclude_none=True))
+print('policy temp_f:', attribute({'asset': {'state': state.model_dump()}}, 'asset.state.temp_f'))
+```
+
+Output:
+
+```text
+{"soc":0.3,"temp_f":71.1235}
+policy temp_f: 71.1235
+```
+
+The unit suite verifies all requested numeric fields, temperature-only preference
+rounding, integer input, rejection outside Cedar's range and of nonfinite/bool
+values, and that `number()` still rejects excess precision. The Hypothesis
+property samples finite temperatures in [-1000, 1000] and resolves the stored
+value through `attribute()` without `FactError`. Both the unit repository check
+and the real PostgreSQL observation/history test confirm that writing
+`soc=0.30000000000000004` then `soc=0.3` is a no-op on the second write; the
+PostgreSQL snapshot contains `0.3`.
+
+The initial lint command reported `I001` for the new Hypothesis import;
+`uv run ruff check --fix tests/unit/test_graph.py` reported
+`Found 1 error (1 fixed, 0 remaining).` The final checks above passed.
+Friction-log review found no new entry earned; temporary uv cache and authorized
+local socket access use the already documented entry 6 procedure.
+No Phase 2 implementation, device action, scheduler implementation, new CI run,
+AWS action, or push was performed. Scheduler authority and Phase 2 fact homes
+are documentation-only requirements; current-phase guidance remains accurate
+and neither instruction file changed.
+
 ## Item 7 — Complete (2026-09-18)
 
 Implemented and verified locally on macOS ARM64, Python **3.12.13**, uv

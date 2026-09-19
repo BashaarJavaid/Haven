@@ -13,16 +13,21 @@ from uuid import uuid4
 
 import pytest
 import yaml
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import ValidationError
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import ProgrammingError
 
 from hirz import cli, db
+from hirz.constitution.conditions import attribute, number
 from hirz.graph.context import ContextService, project, validate_snapshot
 from hirz.graph.models import (
+    AssetPolicy,
     GraphError,
     Household,
     Observation,
+    ObservationState,
     Preference,
     ScheduleEvent,
     utc,
@@ -174,6 +179,79 @@ def test_model_time_and_bounds():
             source="twin",
             state={},
         )
+
+
+def test_policy_fact_quantization():
+    state = ObservationState(
+        soc=0.1 + 0.2, temp_f=71.123456, target_f=72.123456, power_kw=1.123456
+    )
+    assert state.soc == 0.3
+    assert state.temp_f == 71.1235
+    assert state.target_f == 72.1235
+    assert state.power_kw == 1.1235
+    policy = AssetPolicy(
+        household_id=HOME.household_id, id=uuid4(), asset_id=uuid4(), soc_min=0.1 + 0.2
+    )
+    assert policy.soc_min == 0.3
+    pref = HOME.models(AT)["preferences"][0].model_dump()
+    assert Preference.model_validate(pref | {"value": 71.123456}).value == 71.1235
+    assert Preference.model_validate(pref | {"value": 72}).value == 72.0
+    assert (
+        Preference.model_validate(pref | {"key": "other", "value": 71.123456}).value
+        == 71.123456
+    )
+    with pytest.raises(ValueError):
+        number(71.123456)
+
+
+@pytest.mark.parametrize("value", [1e15, -1e15, float("inf"), float("nan"), True])
+def test_policy_fact_rejects_invalid_numbers(value):
+    for field in ("soc", "temp_f", "target_f", "power_kw"):
+        with pytest.raises(ValidationError):
+            ObservationState.model_validate({field: value})
+    pref = HOME.models(AT)["preferences"][0].model_dump()
+    with pytest.raises(ValidationError):
+        Preference.model_validate(pref | {"value": value})
+
+
+@given(
+    st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
+)
+def test_stored_temperature_is_a_policy_fact(value):
+    stored = ObservationState(temp_f=value).temp_f
+    assert attribute(
+        {"asset": {"state": {"temp_f": stored}}}, "asset.state.temp_f"
+    ) == number(stored)
+
+
+def test_quantized_observation_write_is_noop():
+    async def run():
+        conn = connection()
+        repository = GraphRepository(conn, HOME.household_id)
+        observation = Observation(
+            id=uuid4(),
+            household_id=HOME.household_id,
+            observed_at=AT,
+            source="twin",
+            state={"soc": 0.30000000000000004},
+        )
+        async with repository.write(lambda: AT):
+            assert await repository.put("observations", observation)
+        stored = row_values("observations", observation) | {"valid_from": AT}
+        assert stored["attributes"]["state"]["soc"] == 0.3
+        conn.execute.return_value = result(stored)
+        conn.execute.reset_mock()
+        async with repository.write(lambda: AT + timedelta(seconds=1)):
+            assert not await repository.put(
+                "observations",
+                Observation.model_validate(
+                    observation.model_dump() | {"state": {"soc": 0.3}}
+                ),
+                expected_version=AT,
+            )
+        assert conn.execute.await_count == 2  # Lock and read, no write or refresh.
+
+    asyncio.run(run())
 
 
 def test_scope_projection():
