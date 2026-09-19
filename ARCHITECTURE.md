@@ -365,7 +365,7 @@ The typed model everything reasons over. Stored in Postgres as tables plus JSONB
 
 | Entity | Attributes (abridged) |
 |---|---|
-| `Household` | name, timezone, locale, address (for weather/prices), constitution_version, budgets |
+| `Household` | name, timezone, locale, address (for weather/prices), constitution_version |
 | `Member` | display name, role (`owner`, `adult`, `teen`, `child`, `guest`, `caregiver`), linked accounts (Amazon `sub`, Hirz login), presence source, preferences (temperature band, lighting, quiet hours, accessibility), verification methods, `is_trusted_contact` |
 | `TrustedContact` | may or may not be a member; verified channels (phone, email, Hirz app), safe word hash, relationship, last verified |
 | `Asset` | kind (`ev`, `home_battery`, `solar`, `appliance`, `hvac_zone`, `lock`, `camera`, `light`, `doorbell`, `shade`), owner, adapter binding, capabilities, physical parameters (battery kWh, charger kW, zone thermal params), policies (`ev.soc_min`, `needed_by`) |
@@ -843,6 +843,7 @@ Things that never run inside a tool call: the MILP planner, Bedrock calls, the G
 |---|---|---|
 | Postgres | **Fail closed** for every state-changing path; read tools serve the last in-memory context snapshot with `staleness` set and say so in `speakable` | No record, no action. Reading stale state is safe if labeled |
 | Audit write fails | **Fail closed** before the action executes | An action that cannot be recorded does not happen |
+| Host clock moves backwards | Audit append refuses a timestamp earlier than the chain head, stalling that household's audit until real time passes the head | The worker must run with NTP; a future `hirz doctor` check should warn when the head lies in the future |
 | AgentCore Policy / local Dogwood evaluator unreachable or errors | **Fail closed** (`DENY_BOUNDARY`) | Boundary redundancy is the guarantee; treating "couldn't check" as "allowed" would void it |
 | Risk Engine exception | Treated as CRITICAL | A crashed risk calculation is not low risk |
 | Constitution unresolvable condition | Whole condition not satisfied → ASK plus `POLICY_ERROR`; approval cannot authorize until resolved; hard-guard failure → never | Authoring bugs surface as questions, never as silent grants or silent denials |

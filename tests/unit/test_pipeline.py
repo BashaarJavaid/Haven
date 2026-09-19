@@ -5,7 +5,7 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -146,6 +146,24 @@ async def pipeline(
     )
     p.usage = AsyncMock(return_value=used)
     return p
+
+
+def test_connection_failure_logs_household_without_params(caplog):
+    async def run():
+        p = await pipeline()
+        sentinel = "private-action-param-sentinel"
+        a = action(params={"message": sentinel})
+        p.connection.in_transaction = Mock(return_value=False)
+        p.connection.begin = Mock(side_effect=RuntimeError(sentinel))
+        with pytest.raises(PipelineError, match="Pipeline evaluation failed"):
+            await p.evaluate(a, PRINCIPAL)
+        record = caplog.records[-1]
+        assert record.name == "hirz.pipeline.service"
+        assert record.getMessage() == f"Pipeline.evaluate household={HOME}"
+        assert sentinel not in caplog.text
+        assert sentinel not in repr(record.__dict__)
+
+    asyncio.run(run())
 
 
 def test_canonical_vectors_and_safe_validation():

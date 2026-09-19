@@ -1,5 +1,6 @@
 """Internal deterministic pipeline. No authentication endpoint or device executor."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
@@ -38,6 +39,8 @@ from hirz.pipeline.models import (
 )
 from hirz.risk import RiskBand
 from hirz.risk.engine import RiskFacts, score
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -515,6 +518,9 @@ class Pipeline:
         except Exception:
             await self.connection.invalidate()
             await self.connection.rollback()
+            log.exception(
+                "Pipeline.evaluate household=%s", self.household_id, exc_info=False
+            )
             raise PipelineError(
                 "Pipeline evaluation failed; no authorization returned"
             ) from None
@@ -816,6 +822,9 @@ class Pipeline:
             await self.connection.rollback()
             if isinstance(exc, PipelineError):
                 raise
+            log.exception(
+                "Pipeline.mutate household=%s", self.household_id, exc_info=False
+            )
             raise PipelineError(
                 "Pipeline transaction failed; no authorization returned"
             ) from None
@@ -1088,6 +1097,9 @@ class Pipeline:
             await self.connection.rollback()
             if isinstance(exc, PipelineError):
                 raise
+            log.exception(
+                "Pipeline.vote household=%s", self.household_id, exc_info=False
+            )
             raise PipelineError(
                 "Pipeline transaction failed; no authorization returned"
             ) from None

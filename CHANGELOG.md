@@ -8,6 +8,13 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- 2026-09-18: Closed item 11 after the authorized empty-audit development schema
+  reset and reseed; [verification](./docs/verification-log.md#development-database-reset-and-phase-1-review--2026-09-18).
+- 2026-09-18: Phase 1 review: tests discover the local Dogwood binary, pipeline
+  and boundary failures log operation context, and unused `Household.budgets` is
+  removed so budgets remain in constitution rules; documented the activation
+  migration prerequisite and audit-clock failure mode.
+
 - 2026-09-18: Updated the CI installed-wheel catalog check from 21 to 23 entries
   to include item 9's pause/resume actions; [verification](./docs/verification-log.md#item-9-ci-build-check--2026-09-18).
 
@@ -16,7 +23,7 @@ All notable changes are documented here. The format follows
 - 2026-09-18: Item 11's read-only `hirz decide` CLI previews stored, unactivated
   policies using the existing pipeline, explicit hypothetical identity/target
   inputs and canonical Decision JSON. [Contract and tradeoffs](./docs/adr/ADR-003-constitution-yaml-to-cedar.md#item-11-amendment--2026-09-18-author-approved);
-  [verification and outstanding local invocation](./docs/verification-log.md#item-11--2026-09-18). Item remains partial.
+  [verification](./docs/verification-log.md#item-11--2026-09-18).
 
 - 2026-09-18: Phase 1 item 10: read-only audit verification, private sequence-range
   exports and offline verification with independently trusted public keys.

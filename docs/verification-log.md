@@ -814,3 +814,196 @@ Final documentation checks: `git diff --check` passed; `.venv/bin/hirz decide
 were rerun after the edits with the same passing summaries above. Updated Commands
 and Current phase guidance matches in both instruction files (70-word current
 phase); their pre-existing file-specific heading/introduction differences remain.
+
+### Development database reset and Phase 1 review — 2026-09-18
+
+The author authorized resetting the development schema after confirming there was
+no audit history. The original `.env` and signing key were retained. Commands ran
+from the `phase-1` checkout on macOS ARM64 with Python 3.12.13, the existing local
+PostgreSQL and Home Assistant services, and the pinned native Dogwood binary.
+Local database/service calls used sandbox escalation. Shell setup:
+
+```sh
+export UV_CACHE_DIR=/private/tmp/hirz-uv-cache
+export HIRZ_DOGWOOD="$PWD/.tools/dogwood"
+```
+
+Before any destructive command, the read-only inspection was:
+
+```sh
+uv run python - <<'PY'
+import asyncio
+from pathlib import Path
+import sqlalchemy as sa
+from hirz.db import connect_database
+from hirz.local import read_env
+
+async def main():
+    async with connect_database(read_env(Path(".env"))) as connection:
+        await connection.execute(sa.text("SET TRANSACTION READ ONLY"))
+        count = (await connection.execute(sa.text("SELECT count(*) FROM audit_log"))).scalar_one()
+        print(f"audit_log rows: {count}")
+        if count != 0:
+            raise SystemExit("STOP: audit history exists")
+        print("migration: " + (await connection.execute(sa.text("SELECT version_num FROM alembic_version"))).scalar_one())
+
+asyncio.run(main())
+PY
+```
+
+Exit 0; actual output:
+
+```text
+audit_log rows: 0
+migration: 0002_household_graph
+```
+
+```sh
+uv run alembic downgrade base
+```
+
+Exit 0; no stdout or stderr.
+
+```sh
+uv run alembic upgrade head
+```
+
+Exit 0; no stdout or stderr.
+
+```sh
+uv run alembic check
+```
+
+Exit 0; actual output:
+
+```text
+No new upgrade operations detected.
+```
+
+```sh
+uv run hirz seed constitutions/quinn-home.yaml constitutions/quinn-parents.yaml
+```
+
+Exit 0; actual output:
+
+```text
+[{"household": "quinn-home", "household_id": "536fa8ee-854e-56ca-8c5d-5ba418e710a0", "status": "loaded", "constitution_version": 7, "policy_status": "unvalidated", "members": 3, "assets": 9}, {"household": "quinn-parents", "household_id": "bf745178-9146-5952-a310-f1d7e563977b", "status": "loaded", "constitution_version": 1, "policy_status": "unvalidated", "members": 2, "assets": 2}]
+```
+
+```sh
+uv run hirz seed constitutions/quinn-home.yaml constitutions/quinn-parents.yaml
+```
+
+Exit 0; actual output:
+
+```text
+[{"household": "quinn-home", "household_id": "536fa8ee-854e-56ca-8c5d-5ba418e710a0", "status": "unchanged", "constitution_version": 7, "policy_status": "unvalidated", "members": 3, "assets": 9}, {"household": "quinn-parents", "household_id": "bf745178-9146-5952-a310-f1d7e563977b", "status": "unchanged", "constitution_version": 1, "policy_status": "unvalidated", "members": 2, "assets": 2}]
+```
+
+```sh
+uv run hirz doctor
+```
+
+Exit 0; actual output:
+
+```text
+PASS Postgres: authenticated SELECT 1.
+PASS HA: real API, demo devices (simulated); required entities present.
+PASS Signing key: P-256 private key signs and verifies an in-memory probe.
+PASS Migrations: database matches the sole Alembic head; graph tables and household_context present.
+```
+
+```sh
+uv run hirz decide \
+  --household 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --as malik --surface alexa --action finance.transfer_money \
+  --adapter household --entity 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --params '{}'
+```
+
+Exit 0; actual output:
+
+```text
+Hypothetical dry run; policy v7 is unactivated (stored: unvalidated); clock=2026-09-19T03:50:59.840674+00:00; current graph, not historical replay. No authentication, approval, execution grant, device operation, or audit write. Supplied evidence is simulated; boundary is dogwood-local.
+{"decision":"deny","event_type":"DENY_CONSTITUTION","action_id":"act_daa4feb1c8d74333b54910c2bfdbb9d1","risk":null,"constitution":{"version":7,"rule":"finance.transfer_money","mode":"never","conditions_met":false},"boundary":{"engine":"dogwood-local","result":"not_evaluated","reason":"terminal before boundary","context_hash":null,"roles":{}},"approval":null,"budget":null,"explain":{"facts":[],"considered":[],"rejected":[]},"audit_id":null}
+```
+
+The repeated seed was a no-op for both households. Doctor passed all four checks;
+the actual development CLI returned `DENY_CONSTITUTION` with null approval and
+audit IDs. Policy status remains unvalidated/unactivated. The command's UTC clock
+was 2026-09-19; the local session date was 2026-09-18 (America/Los_Angeles).
+This run closes the earlier preserved-database prerequisite limitation; it does
+not claim policy activation, physical execution, AWS enforcement, or a new CI run.
+
+Post-reset read-only inspection (exit 0) confirmed the CLI left the audit empty
+and the removed optional graph field needs no JSONB cleanup:
+
+```sh
+uv run python - <<'PY'
+import asyncio
+from pathlib import Path
+import sqlalchemy as sa
+from hirz.db import connect_database
+from hirz.local import read_env
+
+async def main():
+    async with connect_database(read_env(Path(".env"))) as connection:
+        await connection.execute(sa.text("SET TRANSACTION READ ONLY"))
+        for label, query in (
+            ("audit_log rows", "SELECT count(*) FROM audit_log"),
+            ("household budgets attributes", "SELECT count(*) FROM households WHERE attributes ? 'budgets'"),
+            ("migration", "SELECT version_num FROM alembic_version"),
+        ):
+            print(f"{label}: {(await connection.execute(sa.text(query))).scalar_one()}")
+
+asyncio.run(main())
+PY
+```
+
+```text
+audit_log rows: 0
+household budgets attributes: 0
+migration: 0003_pipeline
+```
+
+`rg -n '\bbudgets\b' hirz/graph tests constitutions alembic` returned no matches
+after removal (exit 1). The former optional field lived in generic JSONB
+attributes, not a dedicated column; the architecture entity row was updated too.
+Constitution-rule budget enforcement is unchanged.
+
+The author approved operation-only logging in `Dogwood.run`, which has no
+household UUID; pipeline records contain the operation and UUID. All four
+`log.exception` calls use `exc_info=False`, preventing upstream exception text
+from leaking SQL parameters, action data, or subprocess output. The one new unit
+test injects the same private sentinel into action params and the raised connection
+exception and checks both formatted logs and the record itself.
+
+Verification commands used the same temporary uv cache; both full suites and
+integration runs explicitly unset `HIRZ_DOGWOOD` to exercise checkout discovery.
+Missing binaries still fail; no skip or dependency was added.
+
+| Command | Actual output / result (exit 0) |
+|---|---|
+| `unset HIRZ_DOGWOOD; uv run pytest` (before the new regression test) | `557 passed, 47 deselected in 56.44s`; `Required test coverage of 80% reached. Total coverage: 85.54%` |
+| `uv run ruff format hirz/pipeline/service.py tests/unit/test_pipeline.py tests/conftest.py` | `1 file reformatted, 2 files left unchanged` |
+| `uv run pytest tests/unit/test_pipeline.py -k connection_failure --no-cov` | `1 passed, 25 deselected in 0.78s` |
+| `uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/ scripts/ alembic/` (final code) | `All checks passed!`; `84 files already formatted`; `Success: no issues found in 40 source files` |
+| `unset HIRZ_DOGWOOD; uv run pytest -m integration --no-cov` (started before the final Dogwood log was added) | `47 passed, 558 deselected in 32.53s`; rerun below against final code |
+| `unset HIRZ_DOGWOOD; uv run pytest` (final code) | `558 passed, 47 deselected in 58.92s`; `Required test coverage of 80% reached. Total coverage: 86.51%` |
+| `unset HIRZ_DOGWOOD; uv run pytest -m integration --no-cov` (final code) | `47 passed, 558 deselected in 33.48s` |
+
+All final checks passed. The integration suite includes the nine CLI acceptance
+examples. The test count increased by one for the requested logging regression.
+The requested `--no-cod` was treated as `--no-cov`, matching the documented
+integration invocation; `o>/.tools/dogwood` was treated as the checkout's
+`.tools/dogwood`.
+
+Final review confirmed the verification log retains its entire prior contents,
+`CLAUDE.md` and `AGENTS.md` carry identical updated guidance, and the diff stays
+within the six review tasks. A temporary extra blank line caught by
+`git diff --check` was removed. Third-party tooling worked as expected: the known
+sandbox cache/socket requirements were handled using the temporary cache and
+sandbox escalation without a new failure or workaround, so no new friction entry
+was earned. No requested local verification remains outstanding. Phase 2 was not
+started; no push, deployment, remote CI run, activation migration, or doctor
+clock check was performed.

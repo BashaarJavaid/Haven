@@ -69,7 +69,6 @@ class Household(Model):
     rate_plan: RatePlan | None = None
     constitution_version: int | None = Field(default=None, gt=0)
     location: Location | None = None
-    budgets: dict[str, Annotated[float, Field(ge=0)]] | None = None
 
     @field_validator("timezone")
     @classmethod

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,8 @@ from typing import Any
 
 from hirz.constitution.compiler import APPROVE, Compiled, action_name, literal
 from hirz.local import REQUEST_TIMEOUT
+
+log = logging.getLogger(__name__)
 
 
 class BoundaryError(ValueError):
@@ -97,6 +100,7 @@ class Dogwood:
                     await process.wait()
                 if isinstance(exc, BoundaryError):
                     raise
+                log.exception("Dogwood.run", exc_info=False)
                 raise BoundaryError(
                     "Dogwood unavailable, timed out, or returned invalid output; no authorization"
                 ) from None

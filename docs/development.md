@@ -83,8 +83,11 @@ its 80% coverage gate; its existing WebSocket fixture needs localhost binding.
 Migrations remain explicit. If a migration or refresh fails, retain data and fix
 the cause; never reset an evolved household to make seeding pass. Item 6 downgrade
 destroys its graph additions and history while retaining the foundation tables;
-`downgrade base` destroys the application tables as well. Exercise downgrade only
-in disposable databases.
+`downgrade base` destroys the application tables as well. Exercise downgrade in
+disposable databases, except for the empty-audit development reset below.
+
+A development schema reset and reseed is permitted whenever a read-only query
+confirms `audit_log` is empty, because there is no audit history to preserve.
 
 Whole-view refresh and graph writers serialize globally. This is the approved
 small-graph implementation; neither the 20 ms context budget nor production write
@@ -277,7 +280,7 @@ It calls the actual argparse dispatch and handler, substituting only database an
 test-key configuration. Native Dogwood, stored policy loading and the pipeline run
 normally. The spending fixture establishes usage with an internal grant, never a
 fabricated audit row or device operation. Actual results and the existing local
-database's prerequisite limitation are recorded in [item 11 evidence](./verification-log.md#item-11--2026-09-18).
+database's reset and successful invocation are recorded in [item 11 evidence](./verification-log.md#development-database-reset-and-phase-1-review--2026-09-18).
 
 ## Audit verification and export (item 10)
 
