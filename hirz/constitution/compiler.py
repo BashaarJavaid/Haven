@@ -203,6 +203,11 @@ def compile_policy(
                     agreement,
                     f"{literal(allowed_roles)}.contains({INPUT}.requester_role)",
                     *requirements(common),
+                    *(
+                        [expression(parse(c)) for c in common.conditions]
+                        if name.startswith("governance.")
+                        else []
+                    ),
                     override_path(common, False),
                 ]
             )
@@ -221,7 +226,7 @@ def compile_policy(
                 ]
             )
             policies.append(f"permit ({scope}) when {{ {household} && {autonomous} }};")
-        if allowed_roles:
+        if allowed_roles and not name.startswith("governance."):
             ttl = common.approval_ttl_minutes or policy.defaults.approval_ttl_minutes
             ttls.setdefault(ttl, []).append(
                 conjunction(

@@ -303,7 +303,7 @@ def test_property_approval_traces(age, mutation, role):
 
 def test_native_operator_count_and_predicate_compilation():
     report = asyncio.run(ENGINE.run(COMPILED, "check-parse"))
-    assert report["policy_count"] == 52
+    assert report["policy_count"] == 56
     assert sum(p["temporal_count"] > 0 for p in report["policies"]) == 1
     assert max(p["temporal_count"] for p in report["policies"]) == 1
     data = HOME.model_dump()
@@ -366,3 +366,19 @@ def test_role_and_class_conditions_use_canonical_boundary_fields():
     assert allowed(compiled, changed, (approval,))
     assert "f_requester_role?" not in compiled.manifest["input_fields"]
     assert "f_action_class?" not in compiled.manifest["input_fields"]
+
+
+def test_same_second_order_and_reserved_governance():
+    action, approval, _ = events()
+    action = replace(action, timestamp=approval.timestamp)
+    assert allowed(COMPILED, action, (approval,))
+    assert not allowed(COMPILED, action)
+    # The trace order remains approval first, even when the clock is unchanged.
+    for name in ("governance.pause_automation", "governance.resume_automation"):
+        for role in ROLES:
+            a, _, _ = events(name=name, role=role)
+            assert allowed(COMPILED, a) is (role != "unknown")
+            voice = replace(a, inputs=dict(a.inputs, f_requester_surface="alexa"))
+            assert allowed(COMPILED, voice) is (
+                role != "unknown" and name == "governance.pause_automation"
+            )

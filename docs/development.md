@@ -178,3 +178,36 @@ conditions. To test the implementation, run
 checks above with the pinned native Dogwood binary available. A sandbox that
 cannot write uv's normal cache can set `UV_CACHE_DIR` to a writable temporary
 directory; this changes tooling storage only.
+
+## Internal pipeline API (item 9)
+
+The API is `hirz.pipeline.service.Pipeline`: `evaluate`, `propose`, `vote`, `redeem`.
+Construct an explicit `PolicyBundle` with `await PolicyBundle.validate(household_id,
+policy, Dogwood())`, then supply a SQLAlchemy async connection, `AuditWriter` wrapping
+the existing validated signing key, and an injected clock. Mutation methods own their
+transaction; pass a connection without an active transaction. The trusted `Principal`
+and typed `SupplementalEvidence` are internal integration inputs, not public request
+bodies. Construct the one canonical `Action`, then set its `content_hash` with
+`hirz.pipeline.hashing.action_hash`. Budget estimates are nonnegative `Decimal` values.
+The full API and trust contract is in [architecture §3.4](../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
+
+With local PostgreSQL running and the existing `.env` initialized, run:
+
+```sh
+export HIRZ_DOGWOOD="$PWD/.tools/dogwood"
+uv run --locked python scripts/smoke_pipeline.py
+```
+
+This runnable internal API example creates a uniquely named `hirz_smoke_*` database,
+migrates and seeds it, validates an explicit policy with native Dogwood, evaluates and
+proposes a notification authorization, records a vote, redeems once, and retries the
+same approval. It asserts one grant and the exact Decimal reservation, then drops only
+its disposable database. It reads the existing signing key without changing credentials.
+Stored seed policies remain unvalidated. No notification is sent or device operated.
+Actual output and checks are recorded once in the [item 9 evidence](./verification-log.md#item-9--complete-2026-09-18).
+
+For the real database checks, `uv run --locked pytest -m integration --no-cov` uses
+uniquely named disposable databases, including upgrade/downgrade and metadata agreement.
+The internal service does not expose `hirz decide` (item 11), authentication, activation,
+physical execution (item 19), or AWS enforcement. Audit append is available internally;
+`verify-audit`, export, and the 100-concurrent-decision gate remain item 10.

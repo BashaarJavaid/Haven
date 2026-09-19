@@ -108,22 +108,26 @@ Alexa+ triggers the loop when a member speaks. The scheduler triggers it when a 
 A proposed `Action` is only ever resolved by this ordered pipeline. The first terminal stops evaluation. Every stage is deterministic and side-effect-free except the last.
 
 ```
-1. Identity + role        → token → member → role; unresolvable → role "unknown" (least authority). Never terminal by itself.
-2. Constitution NEVER     → the action class, for this role, is marked never → DENY_CONSTITUTION (terminal)
-3. Risk floor             → CRITICAL band → DENY_RISK (terminal) or, for verification classes, VERIFY (terminal)
-4. Constitution mode      → auto → continue; ask → ASK (terminal); never was handled in 2
-                            conditions unresolvable → whole rule not satisfied → ASK, plus POLICY_ERROR audit row
-                            household has paused Hirz (§5.14) → auto is treated as ask until a member resumes it in the app
-5. Risk escalation        → HIGH band forces ASK (terminal) even if stage 4 said auto; MEDIUM defers to stage 4
-6. Budgets + limits       → daily spend cap, per-class counts, quiet hours → ASK (soft) or DENY_BUDGET (hard, terminal)
-7. Boundary agreement     → the same action is authorized against the Cedar policy set
-                            (AgentCore Policy in AWS, the Dogwood evaluator locally). Deny or unreachable → DENY_BOUNDARY (terminal, fail closed)
-8. → EXECUTE
+1. Identity + role        → household-scoped provider/sub → current member; unresolved → unknown
+                            intersect linked-account and explicitly claimed-role permissions
+2. Constitution NEVER     → explicit role/class NEVER and hard guards → DENY_CONSTITUTION
+3. Risk + overrides       → score immutable facts; resolve overrides; resulting NEVER still wins
+                            CRITICAL → VERIFY only for finance.verify_request; otherwise DENY_RISK
+4. Confirmation + mode    → missing required confirmation → ASK_REQUESTER_CONFIRMATION (no approval)
+                            unresolved conditions → ASK_UNRESOLVED_CONDITION + POLICY_ERROR (no approval)
+                            known-false conditions, ask mode, or pause → ASK_CONSTITUTION
+5. Risk escalation        → HIGH adds an approval requirement even for auto
+6. Budgets + quiet hours  → used + estimate < daily cap proceeds; equality asks; exceeding denies
+                            quiet hours ask; hard denials win even when an earlier soft gate asks
+7. Boundary agreement     → each applicable role must receive a native Dogwood permit locally
+                            denial, error, timeout or malformed output → DENY_BOUNDARY
+8. → EXECUTE              → on redeem only, commit one durable execution authorization
+
 ```
 
 In AWS mode `EXECUTE` is not the worker calling a device. For devices in the home, a permit at stage 7 is what gets the command signed, and the home obeys only signed commands (§5.17); for cloud adapters, only the Gateway's Lambda can fetch a write-capable credential (§5.11). Locally, stage 7 is the Dogwood evaluator in the same container: a second evaluator in the same trust domain, recorded as `boundary.engine: dogwood-local`, never presented as an outside boundary.
 
-`ASK` produces an `Approval` with a TTL and a quorum rule (§5.5); redemption re-runs stages 1–7 against the original action hash and the *current* world state, so an approval can never authorize a materially different action (TOCTOU guard, §5.6).
+An approvable `ASK` produces an `Approval` with a TTL and a quorum rule (§5.5); redemption re-runs stages 1–7 against the original action hash and the *current* world state, so an approval can never authorize a materially different action (TOCTOU guard, §5.6).
 
 ### 3.3 Why this order
 
@@ -131,6 +135,78 @@ In AWS mode `EXECUTE` is not the worker calling a device. For devices in the hom
 - Risk floor comes before constitution `auto` so that a household cannot accidentally authorize a critical action class by writing an over-broad `auto`. The constitution can tighten a band, never loosen it.
 - Boundary agreement comes last and is redundant on purpose: it catches bugs in stages 2–6, a compiler bug, and any path that reaches the executor without them. Redundancy that fails closed is the point.
 - The boundary is independent about *policy*, not about *facts*. It evaluates the action class, parameter bounds, the action hash (recomputed by the signing Lambda, never taken on trust, §5.17), and the order of approval and action from the request alone. The worker calls the Gateway with its own machine token, because a scheduled action comes due long after the member's token expired, so the requester's role is an input Hirz supplies. The role and the context facts (occupancy, sleeping, quiet hours) are supplied by the Executor from the pipeline's snapshot, hash-bound in the request; the boundary cannot detect a wrong snapshot, and no design on this stack could make it. `docs/constitution.md` §4 and `THREAT_MODEL.md` state the same limit.
+
+### 3.4 Internal pipeline contract (item 9)
+
+`hirz.pipeline.service.Pipeline` accepts an explicit household-bound `PolicyBundle`,
+a native Dogwood instance, an existing P-256 signing key through `AuditWriter`,
+and an injected clock. `PolicyBundle.validate` validates and compiles before use;
+stored seed policies remain **unvalidated**, with their existing hashes. There is
+no activation, public authentication, MCP mutation surface, adapter or AWS path here.
+
+- `evaluate(action, principal, cost=..., evidence=...)` reads current state and
+  returns a Decision without writing actions, approvals, grants or audit rows.
+- `propose(...)` freezes the canonical proposal, trusted requester identity and
+  exact Decimal estimate, persists its Decision, and creates/reuses an approvable
+  ASK. An EXECUTE proposal is still only a recommendation; it reserves no money.
+- `vote(approval_id, principal, approved=...)` records a distinct eligible member's
+  choice. Duplicate votes do not replace the first choice. One rejection ends that
+  request. Quorum uses current members, including domain-eligible caregivers.
+- `redeem(..., approval_id=...)` binds to the stored proposal, recomputes its hash,
+  reloads membership and facts, checks every current gate and the boundary, then
+  atomically commits the grant. An automatic action needs no approval ID. Only the
+  audit row referenced by `actions.grant_seq` is a **committed execution grant**.
+  One household/action ID can receive one grant; intentional repetition needs a
+  new ID. No device is operated. Physical execution is item 19.
+
+Trusted `Principal` is an internal input, not a public request body. Caller-supplied
+Action authority is ignored. Each role in the linked/claimed intersection must
+permit, including at the boundary. Security votes require app surface, trusted
+passkey verification and `verified_action_hash` matching this action. These are
+synthetic internal evidence in tests, not an implementation of passkey authentication
+or item 38d. Names, speaker hints and schedules never establish identity.
+
+Facts come from a fresh complete graph read under the existing graph transaction
+lock; stale fallback is disabled. Devices resolve to exactly one household binding;
+zone UUIDs must name household HVAC zones. Aggregate optimize/comfort actions use
+all assets; member and contact operations use their respective household entities.
+Whole latest observations are selected without backfilling missing fields; conflicting
+simultaneous observations fail closed. Occupancy completeness is required to conclude
+absence or no sleeping occupants. Only an unambiguous linked requester's temperature
+preference is a baseline. Scoped, timestamped, source-labeled supplemental evidence
+supplies absent facts and cannot contradict graph facts. Ages and source labels for
+used observations are retained in the hashed context; governance needs no observations.
+
+Approval TTL begins at ASK creation and repeated calls/votes never extend it.
+Bindings include the action hash, immutable requester/cost, full policy and compiled
+artifact fingerprint, and initial mode/condition, risk band/factors, pause, quiet-hour
+and budget-equality gates. A changed policy or stricter/new gate expires the old
+request and asks afresh; cleared/less restrictive gates can use the original request.
+Unresolved facts cannot be approved. Expiry is `now >= expires_at`, checked again after
+the boundary call. Native events retain vote-before-action order even within one
+second. Boundary failure leaves the approval retryable within its original TTL.
+
+Daily dollar usage is the sum of reservation evidence on committed grant audit rows,
+per household/class and local calendar date. Missing estimates deny budgeted actions.
+Equality can be approved; crossing the cap cannot. ASK, DENY, failed transactions,
+and replay reserve nothing. Settlement, refunds and per-class count limits are
+explicitly deferred, not implemented by this item. Quiet hours use the start day's
+weekday and local time with inclusive start/exclusive end across midnight.
+
+Reserved LOW-risk `governance.pause_automation` and `governance.resume_automation`
+ignore household overrides and pause itself. Any linked member can pause; only an app
+surface can resume. A transition versions household `autonomy_paused` (default false)
+and refreshes the context view with its Decision and AUTONOMY event in one transaction.
+Repeated requests audit the Decision without another transition event.
+
+Mutations own the transaction: graph lock first, then proposal/approval and audit
+pointer locks. Approval consumption, grant reference, reservation, graph history/view,
+and signed append commit together. The existing global graph lock is the documented
+serialization ceiling. Database/signing/audit failures return a safe fail-closed
+error and discard the connection; they never invent an audit reference. A network
+failure after the database actually commits can leave the caller uncertain; a retry
+still cannot grant twice. The smoke procedure is in
+[development](./docs/development.md#internal-pipeline-api-item-9).
 
 ---
 
@@ -155,9 +231,13 @@ Every surface, the audit log, the explainer, and the tests use these shapes. No 
 }
 ```
 
-`target.zone` is an optional household-scoped zone identifier used by constitution predicates; absence/null is unknown when a zone guard needs it. The canonical Python shape is `hirz/pipeline/models.py`; item 7 introduces `Action` only.
+`target.zone` is an optional household-scoped zone identifier used by constitution predicates; absence/null is unknown when a zone guard needs it. The canonical Python shape is `hirz/pipeline/models.py`; item 9 supplies `Action`, `Decision`, and their evidence models.
 
-`content_hash` covers class, target, params, and scheduled_for. It is what an approval binds to.
+`content_hash` is `sha256:` plus SHA-256 of RFC 8785 canonical JSON containing
+exactly class, target, params and scheduled_for. Optional zone/time normalize to
+null; timestamps normalize to UTC, fixed microseconds and `Z`. Invalid/non-finite
+or noncanonicalizable values are refused. Requester and Decimal cost are separately
+immutable; exact money is serialized as strings.
 
 ### 4.2 Decision
 
@@ -177,7 +257,11 @@ Every surface, the audit log, the explainer, and the tests use these shapes. No 
 }
 ```
 
-`decision` ∈ `execute | ask | deny | verify`. `event_type` is one canonical enum: `EXECUTE`, `ASK_CONSTITUTION`, `ASK_RISK`, `ASK_BUDGET`, `ASK_UNRESOLVED_CONDITION`, `DENY_CONSTITUTION`, `DENY_RISK`, `DENY_BUDGET`, `DENY_BOUNDARY`, `DENY_APPROVAL_MISMATCH`, `DENY_APPROVAL_EXPIRED`, `VERIFY`, `APPROVED`, `REJECTED`, `EXPIRED`, `EXECUTED`, `VERIFIED`, `VERIFY_FAILED`, `ROLLED_BACK`, `PLAN_CREATED`, `PLAN_REVISED`, `CONSTITUTION_PROPOSED`, `CONSTITUTION_ACTIVATED`, `POLICY_ERROR`, `ADAPTER_ERROR`, `LINK_REJECTED`, `OUT_OF_BAND_CHANGE`, `AUTONOMY_PAUSED`, `AUTONOMY_RESUMED`, `AUDIT_ANCHORED`, `MEMORY_PROPOSED`, `MEMORY_ACCEPTED`. `boundary.engine` ∈ `agentcore-policy | dogwood-local`.
+`decision` ∈ `execute | ask | deny | verify`. `event_type` is one canonical enum: `EXECUTE`, `ASK_CONSTITUTION`, `ASK_RISK`, `ASK_BUDGET`, `ASK_UNRESOLVED_CONDITION`, `ASK_REQUESTER_CONFIRMATION`, `DENY_CONSTITUTION`, `DENY_RISK`, `DENY_BUDGET`, `DENY_BOUNDARY`, `DENY_APPROVAL_MISMATCH`, `DENY_APPROVAL_EXPIRED`, `DENY_APPROVAL_USED`, `DENY_APPROVAL_UNAUTHORIZED`, `VERIFY`, `APPROVED`, `REJECTED`, `EXPIRED`, `EXECUTED`, `VERIFIED`, `VERIFY_FAILED`, `ROLLED_BACK`, `PLAN_CREATED`, `PLAN_REVISED`, `CONSTITUTION_PROPOSED`, `CONSTITUTION_ACTIVATED`, `POLICY_ERROR`, `ADAPTER_ERROR`, `LINK_REJECTED`, `OUT_OF_BAND_CHANGE`, `AUTONOMY_PAUSED`, `AUTONOMY_RESUMED`, `AUDIT_ANCHORED`, `MEMORY_PROPOSED`, `MEMORY_ACCEPTED`. `boundary.engine` ∈ `agentcore-policy | dogwood-local`.
+
+`risk` is null for pre-scoring denials; `audit_id` is null for read-only evaluation.
+Optional `budget` records local date, class, used/proposed/cap/reserved exact amounts.
+Boundary evidence includes a context hash and the result for each evaluated role.
 
 ### 4.3 Plan
 
@@ -265,8 +349,8 @@ The last successful current snapshot is cached per household in one service inst
 Full spec in [`docs/constitution.md`](./docs/constitution.md). Summary:
 
 - **Authoring.** A rule can be proposed by voice through Alexa (`propose_household_rule`: the sentence is recorded, the worker drafts, the diff goes to the phone; a voice never activates anything). In the companion app there are three equivalent forms: the form editor, YAML, and plain English (Bedrock Sonnet drafts YAML from a sentence like "never unlock the door for someone we're not expecting, and ask me before running the dishwasher after 10"). All three land as one YAML document validated by a Pydantic schema.
-- **Structure.** `roles` with inheritance/domain restrictions; `autonomy` as domains → action classes → rules; `per_role` tightening; `defaults` plus per-rule channels/TTL/quorum; `quiet_hours`, `verification`, and `learning`. The validated models and pure `RuleOutcome` are in `hirz/constitution/`; budgets/quiet hours are configuration until item 9.
-- **Conditions grammar.** A hand-rolled boolean grammar over dotted attributes (`context.hour`, `occupancy.sleeping_any`, `action.params.target_f`, `requester.role`, `risk.band`), comparison operators, `and`/`or`/`not`, membership. Deliberately not Turing-complete: no loops, no functions, no recursion. An unresolvable attribute makes the *whole* condition not-satisfied before negation runs (so `not(x < 5)` with `x` missing cannot silently grant), and returns a `POLICY_ERROR` diagnostic; later pipeline/audit work writes the row.
+- **Structure.** `roles` with inheritance/domain restrictions; `autonomy` as domains → action classes → rules; `per_role` tightening; `defaults` plus per-rule channels/TTL/quorum; `quiet_hours`, `verification`, and `learning`. The validated models and pure `RuleOutcome` are in `hirz/constitution/`; budgets/quiet hours are enforced by the internal item 9 pipeline.
+- **Conditions grammar.** A hand-rolled boolean grammar over dotted attributes (`context.hour`, `occupancy.sleeping_any`, `action.params.target_f`, `requester.role`, `risk.band`), comparison operators, `and`/`or`/`not`, membership. Deliberately not Turing-complete: no loops, no functions, no recursion. An unresolvable attribute makes the *whole* condition not-satisfied before negation runs (so `not(x < 5)` with `x` missing cannot silently grant), and returns a `POLICY_ERROR` diagnostic; mutating pipeline calls write the diagnostic row.
 - **Evaluation.** `resolve(validated_constitution, Action, PolicyFacts) -> RuleOutcome` used at pipeline stages 2, 4, and 6. Pure function of (constitution version, action, context snapshot).
 - **Compilation to Cedar.** Every activated constitution is compiled to a Cedar/Dogwood policy set: one `permit` per `auto` class with its conditions as `when` clauses, one `forbid` per `never`, one stateless `permit` per `ask` class on the `approve_action` tool carrying that rule's allowed requesters and quorum, and one **generic** Dogwood temporal `permit` per distinct approval TTL of the form "permit any action for which an `approve_action` response with the same `action_hash`, the same action class, the same household, and this TTL group occurred within the TTL". Cedar permits are alternatives, so without the TTL group a ten-minute approval could ride the thirty-minute permit; the per-class stateless permit on `approve_action` pins each class to its TTL group, and every policy is scoped to its household so two constitutions on one engine cannot lend each other permits. Emitting the temporal rule per TTL rather than per class keeps a constitution of any size inside the engine's 25-temporal-policy quota. The policy set is attached to the AgentCore Gateway policy engine in AWS and evaluated locally by the open-source Dogwood CLI through a subprocess wrapper (one evaluator, real temporal semantics, no reimplementation). The conformance test asserts both engines agree on the full scenario corpus (§12).
 - **Preview.** Before activation the diff screen shows what changes in concrete situations. A fixed list of situations per action class (`hirz/constitution/situations.yaml`: an unexpected visitor, an expected arrival, a request at 23:00 with someone asleep, a guest asking, and so on) is evaluated against the current and the proposed version with the same evaluator `hirz decide` uses, and the situations whose outcome changed become the before-and-after lines, followed by the standing caveats of the classes touched ("Hirz does not identify the visitor"). No model writes these lines, so a drafting mistake shows up as a line the household did not expect.
@@ -337,7 +421,7 @@ irrelevant fields may be omitted. Invalid supplied fields fail validation even
 when irrelevant. The resolved Action role alone determines `unknown_requester`;
 names, speaker hints, and missing member IDs do not independently trigger it.
 The caller owns household scope, rule selection, the complete observation set,
-and trustworthy fact derivation. Graph-to-facts mapping remains item 9; raw
+and trustworthy fact derivation. The internal pipeline now derives graph facts (§3.4); raw
 Protect extraction/weighting remains item 32. Ages are supplied, never computed
 from a wall-clock read inside scoring, and the risk result does not relabel any
 underlying observation's source.
@@ -349,7 +433,7 @@ distinct +1 factor contributes once, cumulatively, capped at CRITICAL; all
 matching evidence is retained in table order even after saturation. Multiple
 old observations and an offline doorbell together still contribute one
 `state_stale`. A true scam flag forces CRITICAL, including for the LOW-base
-`finance.verify_request`; its later pipeline terminal is VERIFY. An empty
+`finance.verify_request`; its pipeline terminal is VERIFY. An empty
 observation tuple is a caller assertion, not a fallback for missing data.
 
 `risk.floor_outcome(band)` returns `none` for LOW/MEDIUM, `ask` for HIGH, and
@@ -419,7 +503,7 @@ Turns member requests and household facts into constraints and detects conflicts
 The trust layer. Two halves: gating physical actions (through the pipeline like everything else, with `guest_present`, `unknown_requester` factors and the constitution's security domain) and **request verification**, which is the household-graph capability that answers "is this really Dad?" from verified records instead of from the caller.
 
 - **Trusted contacts and verified channels.** A contact may or may not be a member and may live in another Hirz household (Malik is a trusted contact of his parents' household and answers from his own app; no login spans two households in v1). Each contact has channels verified out-of-band at setup (a code sent to the number, a confirmation tapped in the contact's own Hirz app). A channel presented during a request is compared against verified channels; it is never added as verified because a caller said so.
-- **Request assessment.** `assess_request_risk` extracts signals from the member's description of the request with a small deterministic signal set (financial ask, urgency language, secrecy ask, third-party recipient, unverified channel, claimed authority such as "the bank" or "Amazon"). Signals are weighted into a band; `scam_pattern` fires when a financial or access request coincides with an unverified channel and urgency. The LLM is allowed only to extract the signals as structured output when `HIRZ_LLM` is on; the weighting and the band are code, and the model's signals are unioned with the keyword extractor's, so a model can add a warning and never remove one. Schema validation checks the shape of an extraction, not its truth, so the tests include wrong and empty model outputs. A model therefore influences Protect's advice and nothing else. Runtime risk accepts only the deterministic trusted-code scam flag, never the union with model-extracted signals. Besides the already-CRITICAL money and access-code classes, `scam_pattern` can raise the LOW-base `finance.verify_request` to CRITICAL, whose later pipeline terminal is VERIFY (§5.3); it does not authorize a financial or security action. Hirz cannot see the call. A presented number is compared with the contact's verified channels only when the member reads it out, and the answer is "matches the number you have saved" or "does not match", never "it is really him", because caller ID can be forged; when no number is given Hirz says nothing about it. The check through the verified contact is offered at every band, including LOW, not only when `scam_pattern` fires. In offline mode a keyword extractor does the same job with lower recall, and the response says so.
+- **Request assessment.** `assess_request_risk` extracts signals from the member's description of the request with a small deterministic signal set (financial ask, urgency language, secrecy ask, third-party recipient, unverified channel, claimed authority such as "the bank" or "Amazon"). Signals are weighted into a band; `scam_pattern` fires when a financial or access request coincides with an unverified channel and urgency. The LLM is allowed only to extract the signals as structured output when `HIRZ_LLM` is on; the weighting and the band are code, and the model's signals are unioned with the keyword extractor's, so a model can add a warning and never remove one. Schema validation checks the shape of an extraction, not its truth, so the tests include wrong and empty model outputs. A model therefore influences Protect's advice and nothing else. Runtime risk accepts only the deterministic trusted-code scam flag, never the union with model-extracted signals. Besides the already-CRITICAL money and access-code classes, `scam_pattern` can raise the LOW-base `finance.verify_request` to CRITICAL, whose pipeline terminal is VERIFY (§5.3); it does not authorize a financial or security action. Hirz cannot see the call. A presented number is compared with the contact's verified channels only when the member reads it out, and the answer is "matches the number you have saved" or "does not match", never "it is really him", because caller ID can be forged; when no number is given Hirz says nothing about it. The check through the verified contact is offered at every band, including LOW, not only when `scam_pattern` fires. In offline mode a keyword extractor does the same job with lower recall, and the response says so.
 - **Verification methods** (in order of strength): confirmation in the subject's own Hirz app (push, biometric-gated by the phone), a call-back to a verified number (real: telephony provider adapter, out of hackathon scope; twin: simulated), the household safe word (compared as a hash, never spoken by Hirz), and a verified email. `verify_trusted_identity` opens a `VerificationCase`, sends the check-in, and reports status. The check-in names the specific request ("Did you just call her from another number asking for $500?") with three answers: **No, that wasn't me**, **Yes, that was me**, **I'll call her**. A yes confirms that request and nothing more, and Hirz still tells the member to talk to the contact on their saved number. Alexa cannot speak when the reply arrives, so the first response says "ask me again in a minute", the card and the member's phone update on their own, and the result is spoken when the member asks. No reply by the expiry is `no_answer`: "Malik hasn't answered. Don't send anything. Call the number you have saved for him."
 - **Organization verification.** `assess_request_risk` with `claimed_party: organization` checks a claimed organization's presented channel against the household's stored verified contacts for that organization (the utility's real number saved at onboarding) and against a small curated registry shipped with Hirz. Hirz never asserts an organization is legitimate from information the caller supplied; it says "matches your saved contact", "does not match", or "not enough information".
 - **Doorbell flow (Ring).** Ring events arrive by webhook (HMAC-SHA256 verified). Four are used: `button_press` and `motion_detected` (with its `human`/`animal`/`vehicle` classification: "a vehicle arrived at 6:58, Mom is expected at 7:00") feed the `visitor_context`; `device_offline` on the doorbell raises the `state_stale` factor for `security.door_unlock`; `device_online` clears it. Protect matches a press against expected arrivals in `Schedule`, produces a `visitor_context` (expected: Mom at 19:00 ± 30 min; unexpected: unknown), and the companion app and the MCP App show the snapshot with that context. Three facts stay separate in the data and in every sentence: someone is expected around now; a visitor is at the door; an authenticated member has confirmed who it is. The schedule never turns the second into the third. Approval text reads "Someone is at the front door. Mom is expected now.", never "Unlock for Mom", and a stranger who rings inside Mom's window gets the same sentence and the same phone approval (`scenarios/stranger-in-window.yaml`). An *unexpected visitor* means a press that matches no expected arrival window; it does not mean a person Hirz failed to recognize, because Hirz recognizes nobody. Ring is an event and media source only; its Partner API has no lock or access-control capability. Any unlock is a `security.door_unlock` action on the `devices` adapter (a Home Assistant lock, real or twin) through the pipeline; when the household's constitution carries `never_for: [unexpected_visitor]`, it applies as a hard veto (it is the household's rule, not a built-in floor; without it an unexpected visitor is an `ask` on the phone). No face recognition: Hirz never claims to identify a person from video ([THREAT_MODEL](./THREAT_MODEL.md)).
@@ -440,7 +524,17 @@ Two stores with a clear split:
 
 ### 5.10 Audit Ledger
 
-Append-only Postgres table with a SHA-256 hash chain and per-row ECDSA P-256 signatures, the same design as the author's PortunusMCP gateway: `seq`, `event_type`, `payload` (canonical JSON, RFC 8785 via `canonicaljson`), `prev_hash`, `curr_hash`, `signature`, `key_fingerprint`, `created_at`. Each household has its own sequence and pointer. Its chain pointer is updated in the same transaction as the insert (one writer at a time per household, `SELECT ... FOR UPDATE` on that household's pointer row), which is what keeps the chain contiguous under concurrent decisions. `hirz verify-audit` walks and verifies the chain and every signature; `hirz audit export --range` produces a self-contained verifiable file. The companion app's audit view and the MCP `get_action_audit` tool read from this table and never from logs.
+Append-only Postgres table with a SHA-256 hash chain and per-row ECDSA P-256 signatures, the same design as the author's PortunusMCP gateway: `seq`, `event_type`, `payload` (canonical JSON, RFC 8785 via `rfc8785`), `prev_hash`, `curr_hash`, `signature`, `key_fingerprint`, `created_at`. Each household has its own sequence and pointer. Its chain pointer is updated in the same transaction as the insert (one writer at a time per household, `SELECT ... FOR UPDATE` on that household's pointer row), which is what keeps the chain contiguous under concurrent decisions. `hirz verify-audit` walks and verifies the chain and every signature; `hirz audit export --range` produces a self-contained verifiable file. The companion app's audit view and the MCP `get_action_audit` tool read from this table and never from logs.
+
+**Item 9 append primitive.** The canonical signed envelope contains household ID,
+sequence, event type, payload, previous hash, key fingerprint and UTC creation time.
+SHA-256 produces `curr_hash`; ECDSA P-256 signs that digest using SHA-256 Prehashed,
+with DER signatures and a SHA-256 DER SubjectPublicKeyInfo fingerprint. Sequence is
+allocated before serializing `Decision.audit_id`. Append and pointer update share
+the pipeline transaction, with zero-hash genesis; incompatible keys and invalid
+pointer state are refused. Credentials are never initialized by the pipeline.
+Verifier/export and the 100-concurrent-decision gate remain item 10; anchors remain
+item 38b. Only the append dependency was pulled forward.
 
 **Anchoring.** The worker holds the signing key and database write access, so a compromised worker could rewrite the chain and re-sign it; the chain alone is tamper-evident only against an attacker who has the database. In AWS mode the chain head (`seq`, `curr_hash`, timestamp) is therefore written hourly, and on every `CONSTITUTION_ACTIVATED`, to an S3 bucket with Object Lock in governance mode (retention through the judging window; compliance mode would block `cdk destroy`). The worker's role has put-only access to that bucket. `hirz verify-audit --anchors` compares the chain with the anchors and detects any rewrite of history before the last anchor; each anchor is also an `AUDIT_ANCHORED` row. Local mode records "not anchored: local mode". Per-row signing stays on the local key: a KMS call per row would sit inside the audit write path and the latency budget, add a fail-closed dependency, and still sign whatever a compromised worker asked for.
 
@@ -554,6 +648,9 @@ graph LR
 
 ## 6. Data model (Postgres)
 
+The table below includes target-state components; implemented item 9 storage is
+specified in §6.2.
+
 | Table | Purpose |
 |---|---|
 | `households`, `members`, `member_accounts` (provider, `sub`), `member_passkeys` (credential id, public key, added_at, revoked_at), `trusted_contacts`, `contact_channels` (kind, value_hash, verified_at) | Graph: people and trust |
@@ -563,7 +660,7 @@ graph LR
 | `constitution_versions` (yaml, compiled_cedar, hash, analysis_report, activated_at), `constitution_proposals` (sentence, proposed_by, surface, drafted_patch, status) | Constitution history and rules proposed by voice |
 | `plans`, `plan_actions`, `plan_constraints`, `plan_alternatives` | Plans |
 | `actions`, `action_transitions` | Executor lifecycle |
-| `approvals` (action_id, content_hash, quorum, expires_at, decided_by, decided_at) | Ask outcomes |
+| `approvals`, `approval_votes` (household/action binding, expiry, state and distinct member votes; §6.2) | Ask outcomes |
 | `verification_cases`, `verification_signals` | Protect |
 | `memory_proposals` | Consent-gated learning |
 | `audit_log` (+ `audit_pointer`), `audit_anchors` (seq, curr_hash, object key, anchored_at) | Hash chain and its external anchors |
@@ -604,6 +701,22 @@ an existing malformed key or a key whose loss accompanies existing audit rows.
 The local doctor checks services, a signing probe, and migration revision/table
 presence without repairing or writing anything. Full schema drift, graph behavior,
 constitution compilation, and AWS checks are outside item 3.
+
+### 6.2 Item 9 storage (2026-09-18)
+
+Revision `0003_pipeline` adds the following to the versioned graph schema. Decisions
+and reservations are audit payloads, not additional tables.
+
+| Table | Implemented fields |
+|---|---|
+| `actions` | Household/action primary key, immutable canonical `proposal` JSONB, trusted `principal` identity JSONB, exact nonnegative `cost` text, nullable `grant_seq` with household-scoped audit foreign key |
+| `approvals` | Household/`apr_` UUID-based ID primary key, household-scoped action foreign key, `pending/approved/rejected/expired/redeemed` status, binding JSONB, creation and expiry timestamps; one pending/approved request per action |
+| `approval_votes` | Household/approval/member primary key, household-scoped approval/member foreign keys, Boolean choice, trusted principal evidence JSONB, vote timestamp |
+
+`autonomy_paused` is a versioned household attribute with model default false.
+Changed pause state uses the graph repository's current version token. No lifecycle
+queue, spend-counter or separate decision table is introduced. Executor transitions
+and public authentication fields remain later work. See [ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-9-amendment--2026-09-18).
 
 ---
 

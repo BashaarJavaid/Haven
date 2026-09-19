@@ -40,8 +40,8 @@ def test_seeds_and_lossless_render(seed, tmp_path):
     assert load(path) == policy
     assert render(load(path)) == render(policy)
     assert any("ev soc floor: 0.3" in line for line in render(policy))
-    assert len(CLASSES) == len(SITUATIONS) == 21
-    assert any("runtime enforcement pending item 9" in line for line in render(policy))
+    assert len(CLASSES) == len(SITUATIONS) == 23
+    assert any("enforced by the internal pipeline" in line for line in render(policy))
     assert all(
         CLASSES[c]["band"] != "HIGH" or policy.rule(c, "owner").mode != "auto"
         for c in CLASSES
@@ -498,7 +498,7 @@ def test_cli_workflows_and_errors(tmp_path, capsys, monkeypatch):
         output = json.loads(capsys.readouterr().out)
         assert output["valid"] and output["analysis"] == "not analyzed: local mode"
         if operation == "compile":
-            assert len(output["manifest"]["actions"]) == 21
+            assert len(output["manifest"]["actions"]) == 23
     path = tmp_path / "bad.yaml"
     path.write_text(dump(home()).replace("version: 7", "version: 0"))
     monkeypatch.setattr("sys.argv", ["hirz", "constitution", "validate", str(path)])

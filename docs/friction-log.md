@@ -42,6 +42,26 @@ The full pytest run also hit entry 6's existing loopback restriction:
 `PermissionError: [Errno 1] error while attempting to bind on address ('127.0.0.1', 0): [errno 1] operation not permitted`.
 The suite was rerun with sandbox escalation for those disposable local sockets.
 
+Item 9 follow-up to entries 6 and 8 (2026-09-18): adding the approved
+`rfc8785==0.1.4` dependency first hit the same uv cache permission error quoted
+above. A temporary cache then reached the sandbox DNS restriction:
+
+```text
+error: Request failed after 3 retries in 4.1s
+  cause: Failed to fetch: `https://pypi.org/simple/pydantic/`
+  cause: error sending request for url (https://pypi.org/simple/pydantic/)
+  cause: client error (Connect)
+  cause: dns error
+  cause: failed to lookup address information: nodename nor servname provided, or not known
+```
+
+Authorized escalation installed the pinned dependency and updated the lockfile.
+The first PostgreSQL test attempt hit `connection to server at "127.0.0.1", port 5432 failed: Operation not permitted`;
+the disposable-database tests and local socket tests passed with escalation.
+These are repeat environment restrictions, not new upstream defects. References:
+[uv CLI](https://docs.astral.sh/uv/reference/cli/) and the
+[approved canonicalizer](https://github.com/trailofbits/rfc8785.py).
+
 ## Candidates (not yet hit)
 
 - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be invoked proactively.

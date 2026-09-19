@@ -387,3 +387,173 @@ Final documentation review: `git diff --check` passed. A Python comparison of
 the catalog against `git show HEAD:hirz/risk/classes.yaml` confirmed all 21 old
 profiles are identical after excluding the added freshness field. Comparing
 `AGENTS.md` and `CLAUDE.md` from `## Project` onward confirmed matching bodies.
+
+
+## Item 9 — Complete (2026-09-18)
+
+### Scope and environment
+
+Implemented the approved internal deterministic pipeline, canonical Decisions,
+immutable proposals, household-scoped approvals/votes, atomic single redemption,
+daily exact-Decimal budget reservations, and versioned pause/resume. The signed
+append dependency is pulled forward from item 10. A committed grant is the audit
+row referenced by `actions.grant_seq`; no physical execution is claimed.
+[Architecture contract](../ARCHITECTURE.md#34-internal-pipeline-contract-item-9);
+[storage decision](./adr/ADR-002-postgres-over-dynamodb.md#item-9-amendment--2026-09-18).
+
+Local Darwin arm64; Python 3.12.13, SQLAlchemy 2.0.54, cryptography 50.0.1,
+rfc8785 0.1.4. Existing `.tools/dogwood`, pinned source revision
+`996d756de1013b7ae209a14f566a80375a59f2f0`, used through `HIRZ_DOGWOOD`.
+PostgreSQL was reached at 127.0.0.1:5432 using existing `.env` credentials.
+All migration, race and API-smoke writes used uniquely named disposable databases;
+the ordinary development database and its stored seed policies were not migrated
+or activated. No credentials were initialized/replaced. No AWS or CI run is claimed.
+
+### Checks actually run
+
+The installed virtual environment was updated with `uv add 'rfc8785==0.1.4'`;
+`pyproject.toml` and `uv.lock` are pinned. Tests used that environment directly:
+
+```sh
+HIRZ_DOGWOOD="$PWD/.tools/dogwood" .venv/bin/pytest -q --tb=short
+HIRZ_DOGWOOD="$PWD/.tools/dogwood" .venv/bin/pytest -m integration --no-cov -q --tb=short
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/mypy hirz/ scripts/ alembic/
+git diff --check
+HIRZ_DOGWOOD="$PWD/.tools/dogwood" .venv/bin/python scripts/smoke_pipeline.py
+```
+
+The service-free suite includes required native Dogwood conformance, the existing
+generated corpus, same-second ordering, and reserved governance permissions.
+Its final summary and coverage table:
+
+```text
+Name                              Stmts   Miss  Cover   Missing
+---------------------------------------------------------------
+hirz/__init__.py                      0      0   100%
+hirz/api/__init__.py                  0      0   100%
+hirz/api/app.py                       5      0   100%
+hirz/cli.py                         105      0   100%
+hirz/constitution/__init__.py         0      0   100%
+hirz/constitution/boundary.py       107     10    91%   92, 103-107, 125, 135, 151, 164
+hirz/constitution/cli.py             29      0   100%
+hirz/constitution/compiler.py       151      3    98%   120, 125, 254
+hirz/constitution/conditions.py     268     12    96%   95, 114, 131, 158-159, 182, 187, 210, 228, 298, 307, 319
+hirz/constitution/evaluator.py       99      1    99%   113
+hirz/constitution/preview.py         54      1    98%   131
+hirz/constitution/render.py          65      1    98%   50
+hirz/constitution/schema.py         212      8    96%   58, 138, 248, 267, 288, 305, 316, 319
+hirz/db.py                           88     19    78%   319-323, 327, 331-341, 348-360
+hirz/graph/__init__.py                0      0   100%
+hirz/graph/context.py               120      4    97%   82, 85, 88, 237
+hirz/graph/models.py                156      0   100%
+hirz/graph/repository.py            137     17    88%   144, 186, 192, 194-208, 210, 230-232
+hirz/graph/seeds.py                 147     43    71%   37, 59, 61, 100, 115, 176-214, 228-271
+hirz/local.py                        31      0   100%
+hirz/pipeline/__init__.py             0      0   100%
+hirz/pipeline/audit.py               37     19    49%   25, 43-114
+hirz/pipeline/context.py            145     16    89%   56, 65, 92, 102-108, 149, 151-156, 158, 160, 169, 201, 254
+hirz/pipeline/hashing.py             38      3    92%   24, 55-56
+hirz/pipeline/models.py             150      1    99%   102
+hirz/pipeline/service.py            383    199    48%   114, 121, 147, 150-162, 174-191, 198-211, 499-518, 523-534, 539, 549-564, 567-575, 585-626, 642-643, 649-683, 693, 704, 711-751, 755-756, 777-815, 828-915, 920-1087
+hirz/risk/__init__.py                26      0   100%
+hirz/risk/engine.py                  77      0   100%
+---------------------------------------------------------------
+TOTAL                              2630    357    86%
+Required test coverage of 80% reached. Total coverage: 86.43%
+485 passed, 24 deselected in 53.17s
+```
+
+The real PostgreSQL suite covers populated upgrades, metadata agreement, scoped
+foreign keys and destructive downgrade only in disposable databases, plus the new
+pipeline tests. Its final run (including the final claimed-role vote restriction
+and native dual-role check):
+
+```text
+........................                                                 [100%]
+24 passed, 485 deselected in 12.86s
+```
+
+Static checks: `All checks passed!`; `76 files already formatted`;
+`Success: no issues found in 37 source files`; `git diff --check` exited 0.
+
+### Pipeline evidence
+
+- Explicit NEVER/hard guards skip scoring; risk-dependent NEVER outranks CRITICAL.
+  Tests cover DENY_RISK, VERIFY only for financial verification, HIGH escalation,
+  requester confirmation, unresolved versus known-false conditions, pause, quiet
+  hours, budget equality/crossing, invalid targets and fail-closed boundary results.
+- Context checks cover incomplete occupancy, whole observations, missing state,
+  stale readings, simultaneous conflicts, ambiguous bindings/preferences,
+  household-scoped evidence, source preservation and local overnight quiet hours.
+- Identity comes from current household account links. Tests include forged Action
+  requester metadata, claimed-role intersection, account revocation, requester
+  demotion, caregivers in all-adult quorum and an empty owner quorum. The native
+  security grant evaluates both linked owner and claimed adult roles; a claimed
+  child cannot cast the owner's vote. Missing/wrong-hash security evidence is refused.
+- TOCTOU checks change class, target (including zone), nested params, scheduled time,
+  requester metadata and cost. Normalization covers reordered keys, equivalent UTC
+  times and numeric forms, with non-finite/noncanonicalizable data refused.
+- Repeated ASK reuses the original request/deadline; duplicate votes leave one
+  persisted vote. Rejection, expiry, changed policy, new pause requirements,
+  cleared pause, replay and expiry after native authorization are exercised.
+  Boundary denial preserves the approved request for retry inside its TTL.
+- **20 concurrent redemptions: exactly 1 committed grant and 19
+  DENY_APPROVAL_USED Decisions.** The committed reservation was 6; two further
+  approved actions costing 3 each raced against the remaining allowance of 4:
+  one EXECUTE and one DENY_BUDGET, final reservation total 9. These are synthetic
+  test dollar inputs, not product savings claims.
+- Equality at a cap of 1 creates ASK_BUDGET and can reserve exactly 1 after approval;
+  the next 0.01 request is denied. Signing, audit INSERT and COMMIT failures each
+  leave no grant, approval consumption or dollar reservation. Pause failures leave
+  no graph/history/view change or AUTONOMY transition; repeated pause does not add
+  another transition event. Existing caller transactions are refused and preserved.
+- Every row in the native approval flow was independently checked in the test for
+  contiguous sequence, previous hash, RFC 8785 envelope hash and ECDSA Prehashed
+  signature; persisted Decision audit IDs match their allocated sequences.
+  An incompatible key and an invalid audit pointer are refused. This is testing of
+  the append primitive, not delivery of item 10's public verifier/export.
+
+### Runnable API output
+
+`scripts/smoke_pipeline.py` completed against native Dogwood and its own disposable
+database, asserting the sequence and exact reservation before cleanup:
+
+```text
+evaluate=ASK_CONSTITUTION audit=None
+propose=ASK_CONSTITUTION; vote=APPROVED
+redeem=EXECUTE; boundary=dogwood-local; reserved=0.25
+replay=DENY_APPROVAL_USED; committed_grants=1; device_operations=0
+stored_seed=unvalidated; source=twin; public_authentication=not_implemented
+```
+
+### Failures found and fixed during implementation
+
+The first regression run, before pipeline tests were added, reported 447 passed,
+10 failed and 73.06% coverage. Stale catalog/policy-count assertions needed the two
+reserved governance classes; loopback tests also hit the existing sandbox restriction.
+The initial new precedence test missed the seed's required requester confirmation
+and was corrected. The pause integration test then exposed `Row version conflict.`:
+the graph update now supplies its current version token. Injected COMMIT failure
+exposed a physical transaction remaining open after SQLAlchemy closed its transaction
+object (`assert 9 == 7` audit-row count). Failed owned transactions now discard the
+connection, and the rollback checks pass. An idle-connection preflight preserves
+any transaction owned by the caller. Final review also required action-hash-bound
+security evidence and claimed-role restrictions on votes; the final native/database
+suite verifies both. No known failing check remains.
+
+The uv cache, sandbox DNS and local PostgreSQL/socket restrictions repeated existing
+friction entries; exact errors and successful workaround are appended to
+[the friction log](./friction-log.md). No upstream Dogwood defect or fallback is claimed.
+
+### Deliberately outstanding
+
+Item 10 still owns verifier/export and the 100-concurrent-decision gate; item 11
+owns `hirz decide`; item 19 owns physical execution. Public authentication/passkeys,
+policy activation, adapters, AWS enforcement/anchors, settlement/refunds and
+per-class action-count limits are not implemented here. Stored policies remain
+unvalidated. Synthetic internal passkey evidence proves no public authentication
+or compromised-worker protection. The global graph lock remains a throughput
+ceiling. A lost commit acknowledgment can leave the caller uncertain, but replay
+cannot grant twice. Threat claims are limited to the tested internal grant path.

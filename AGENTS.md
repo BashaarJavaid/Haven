@@ -79,7 +79,8 @@ initialization and service checks, Alembic migrations, and the local doctor.
 Item 6 also supplies explicit demo seeding and redacted context reads. Item 7 adds
 read-only constitution validation, compilation, and preview; native Dogwood setup
 is in `docs/development.md`. Item 8 adds standalone Python risk scoring; its API
-smoke procedure is also in `docs/development.md`. The other commands below remain target state.
+smoke procedure is also in `docs/development.md`. Item 9 adds the internal pipeline API and disposable `scripts/smoke_pipeline.py`
+example; signed append is internal only. The other commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -109,7 +110,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 and Phase 1 items 6–8 are complete and verified locally; item 9 (decision pipeline) is next.** Constitution evaluation, native Dogwood, preview, and standalone risk scoring pass local checks. Stored seeds remain unvalidated with their old hashes; runtime pipeline integration, activation, authenticated approvals, signed audit and device actions are still pending. Evidence: `docs/verification-log.md`; setup/API smoke: `docs/development.md`. AWS comparison remains item 37; four CI jobs remain placeholders.
+**Phase 0 and Phase 1 items 6–9 are complete and verified locally; item 10's audit verifier/export is next.** Internal Decisions, approvals, budget reservations, pause/resume and signed grants pass native Dogwood and PostgreSQL checks. Stored seeds remain unvalidated; public authentication, activation, physical execution and AWS enforcement are pending. Item 11 still owns `hirz decide`. Evidence: `docs/verification-log.md`; API smoke: `docs/development.md`. Four CI jobs remain placeholders.
 
 ---
 

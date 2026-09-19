@@ -194,12 +194,24 @@ class Constitution(Model):
         )
 
     def rule(self, action_class: str, role: Role) -> Rule:
+        if action_class in {
+            "governance.pause_automation",
+            "governance.resume_automation",
+        }:
+            return Rule(
+                mode="auto",
+                conditions=('requester.surface == "app"',)
+                if action_class.endswith("resume_automation")
+                else (),
+            )
         domain, name = action_class.split(".")
         return self.autonomy.get(domain, {}).get(
             name, Rule(mode="ask" if "adult" in self.lineage(role) else "never")
         )
 
     def role_mode(self, action_class: str, role: Role) -> Mode:
+        if action_class.startswith("governance."):
+            return "never" if role == "unknown" else "auto"
         rule = self.rule(action_class, role)
         if not self.domain_allowed(role, action_class) or (
             rule.allowed_requesters is not None and role not in rule.allowed_requesters
@@ -251,6 +263,8 @@ class Constitution(Model):
                 raise ValueError("Unknown action domain")
             for name, rule in rules.items():
                 action_class = f"{domain}.{name}"
+                if domain == "governance":
+                    raise ValueError("Governance controls are reserved")
                 if action_class not in CLASSES:
                     raise ValueError("Unknown action class")
                 if (

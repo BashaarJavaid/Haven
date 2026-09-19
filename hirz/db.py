@@ -358,3 +358,75 @@ def require_empty_audit(connection: sa.Connection) -> None:
         )
     if connection.scalar(sa.select(sa.exists().select_from(audit_log))):
         raise LocalError("Audit rows exist; restore the original AUDIT_SIGNING_KEY.")
+
+
+# Item 9 stores proposals and votes; Decisions and reservations live in audit_log.
+actions = sa.Table(
+    "actions",
+    metadata,
+    sa.Column(
+        "household_id", sa.UUID, sa.ForeignKey("households.id"), primary_key=True
+    ),
+    sa.Column("action_id", sa.Text, primary_key=True),
+    sa.Column("proposal", JSONB, nullable=False),
+    sa.Column("principal", JSONB, nullable=False),
+    sa.Column("cost", sa.Text),
+    sa.Column("grant_seq", sa.BigInteger),
+    sa.ForeignKeyConstraint(
+        ["household_id", "grant_seq"], ["audit_log.household_id", "audit_log.seq"]
+    ),
+    sa.CheckConstraint("length(action_id) > 0", name="actions_id_nonempty"),
+    sa.CheckConstraint(
+        "jsonb_typeof(proposal) = 'object' AND jsonb_typeof(principal) = 'object'",
+        name="actions_objects",
+    ),
+    sa.CheckConstraint(
+        "cost IS NULL OR cost ~ '^[0-9]+([.][0-9]+)?$'", name="actions_cost_nonnegative"
+    ),
+)
+approvals = sa.Table(
+    "approvals",
+    metadata,
+    sa.Column("household_id", sa.UUID, primary_key=True),
+    sa.Column("approval_id", sa.Text, primary_key=True),
+    sa.Column("action_id", sa.Text, nullable=False),
+    sa.Column("status", sa.Text, nullable=False),
+    sa.Column("binding", JSONB, nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(
+        ["household_id", "action_id"], ["actions.household_id", "actions.action_id"]
+    ),
+    sa.CheckConstraint(
+        "approval_id ~ '^apr_[0-9a-f]{32}$'", name="approvals_id_format"
+    ),
+    sa.CheckConstraint(
+        "status IN ('pending','approved','rejected','expired','redeemed')",
+        name="approvals_status",
+    ),
+    sa.CheckConstraint("expires_at > created_at", name="approvals_ttl"),
+)
+sa.Index(
+    "approvals_one_pending",
+    approvals.c.household_id,
+    approvals.c.action_id,
+    unique=True,
+    postgresql_where=sa.text("status IN ('pending', 'approved')"),
+)
+approval_votes = sa.Table(
+    "approval_votes",
+    metadata,
+    sa.Column("household_id", sa.UUID, primary_key=True),
+    sa.Column("approval_id", sa.Text, primary_key=True),
+    sa.Column("member_id", sa.UUID, primary_key=True),
+    sa.Column("approved", sa.Boolean, nullable=False),
+    sa.Column("principal", JSONB, nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(
+        ["household_id", "approval_id"],
+        ["approvals.household_id", "approvals.approval_id"],
+    ),
+    sa.ForeignKeyConstraint(
+        ["household_id", "member_id"], ["members.household_id", "members.id"]
+    ),
+)

@@ -80,3 +80,26 @@ The approved synthetic contents and loader contract are documented in
 [development procedures](../development.md). They grant Malik no membership or
 login in his parents' home. The decisions in this amendment supersede only the
 corresponding graph target-state details; threat-model rows remain unearned.
+
+## Item 9 amendment — 2026-09-18
+
+The approved internal pipeline uses three additional household-scoped tables:
+`actions` (immutable proposal/requester/cost and grant reference), `approvals`, and
+`approval_votes`. Decisions and dollar reservations stay in the signed audit ledger;
+separate decision, budget-counter and execution-queue tables were rejected as
+unnecessary. The existing graph transaction lock precedes approval and audit pointer
+row locks, so single redemption, budget reservation and graph changes commit together.
+The global serialization ceiling remains intentional pending measured contention.
+
+The signed append primitive is pulled forward from item 10 because an item 9 grant
+cannot safely commit without its audit row. The verifier, export and 100-concurrent-
+decision gate stay in item 10. “One execution” in item 9's existing verification
+sentence means **one durable execution authorization**, not device actuation; the
+executor remains item 19. Dollar estimates reserve on grant; settlement/refunds and
+per-class action-count limits are explicitly deferred. A second counter subsystem
+or pretending that an ASK reserved spend was rejected.
+
+Canonicalization uses the approved [Trail of Bits RFC 8785 implementation](https://github.com/trailofbits/rfc8785.py),
+not `canonicaljson` (which was incorrectly named as RFC 8785). Exact envelope and
+hashing contracts are in [architecture §3.4 and §5.10](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
+Neither migrations nor the pipeline initialize or replace signing credentials.

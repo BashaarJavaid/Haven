@@ -194,7 +194,9 @@ invalid numeric facts fail closed, never round. See [AgentCore numeric limits](h
 `schedule.expected_within(member_id, minutes)` checks an expected arrival from
 snapshot time through the future horizon, inclusive. The snapshot's member and
 zone identifiers are household-scoped. Missing occupancy/schedule collections are
-unknown; explicitly empty collections mean nobody present, sleeping, or expected.
+unknown; explicitly empty collections assert nobody present, sleeping, or expected.
+The internal pipeline requires occupancy completeness evidence before constructing
+a negative occupancy fact.
 Optional `action.target.zone` and `context.unexpected_visitor` are supplied facts.
 The `unexpected_visitor` veto exists only when the household writes `never_for`.
 
@@ -215,8 +217,8 @@ and `POLICY_ERROR`. Physical safety clamps remain separate, above these bounds.
 
 Quiet-hour days identify the interval's **start day** in household local time.
 Intervals include their start, exclude their end, and carry across midnight.
-Affected `auto` actions escalate to `ask`. This is validated/rendered here and
-awaits item 9 enforcement; preview does not pretend to enforce it.
+Affected `auto` actions escalate to `ask` in the internal pipeline. Preview only
+compares this configuration; it does not apply runtime gates.
 
 A household can also **pause** Hirz (`ARCHITECTURE.md` §5.14): while paused, every `auto` resolves as `ask`. Pause is a mode on the household, not a constitution version; it only tightens, so a voice may set it, and only the app clears it.
 
@@ -357,7 +359,7 @@ Activation is refused while any `ask` for a class whose rule is changing has a p
 | Situation | Resolution | Why |
 |---|---|---|
 | Malik (owner) asks to pre-warm the living room to 72 at 17:35; nobody asleep | `auto` → EXECUTE | `energy.hvac_adjust` auto, bounds met, condition met, band LOW |
-| Same, at 23:40, Mom asleep in the living room target zone | `ask` → ASK | exact-zone override → ask; standalone risk scoring is in architecture §5.3; pipeline composition remains item 9 |
+| Same, at 23:40, Mom asleep in the living room target zone | `ask` → ASK | exact-zone override → ask; standalone risk scoring is in architecture §5.3; the internal pipeline composes both (architecture §3.4) |
 | Teen asks Alexa to unlock the front door | `never` → DENY_CONSTITUTION | `per_role.teen.security.door_unlock: never` |
 | Malik asks to unlock the door for "the plumber" not on the schedule, under version 7 (no `never_for`) | `ask` → ASK on the phone | The household has not written a veto; a security class still asks, and never by voice |
 | The same request after Malik activates version 8 with `never_for: [unexpected_visitor]` | DENY_CONSTITUTION, citing version 8 | The household wrote the veto; it holds regardless of the requester. Same lock, different outcome, because the family changed the rule |
@@ -395,7 +397,8 @@ in `tests/unit/test_constitution.py` and `tests/cedar_conformance/test_local.py`
 envelope, rejects duplicate keys, and does not read/write the database.
 `resolve(validated_constitution, Action, PolicyFacts)` is pure. `PolicyFacts` owns
 an immutable deep snapshot, household, aware `as_of`, and household-scoped member/
-zone identifiers. It is explicitly supplied; graph-to-policy assembly is item 9.
+zone identifiers. It is explicitly supplied to the pure evaluator; the internal pipeline assembles
+it from the graph (architecture §3.4).
 `RuleOutcome` includes version, class rule, effective mode, conditions status,
 approval requirements, bounds/budget configuration, and value-free diagnostics.
 There is no `Decision`, audit event, approval authentication or activation here.
@@ -418,8 +421,31 @@ preserves semantics. There is no English parser. Preview returns every changed
 situation and unchanged situations for affected classes without UI truncation;
 consumer lines are separate from structured diagnostics and pending configuration.
 For home v7 → v8, the three consumer lines are exactly the README's expected lines.
-Budgets, quiet hours, verification and learning configuration are clearly marked
-as awaiting later-stage enforcement.
+Preview does not execute budget, quiet-hour, confirmation or learning gates.
+Budget, quiet-hour and confirmation enforcement is now in the internal pipeline;
+learning remains later work.
 
 Commands, native setup, package/container behavior, and stored-seed recovery are
 in [development procedures](./development.md#local-constitution-workflows-item-7).
+
+
+## Item 9 runtime contract — 2026-09-18
+
+The [internal pipeline contract](../ARCHITECTURE.md#34-internal-pipeline-contract-item-9)
+now applies the policy to fresh household facts and persisted approvals. Explicit
+NEVER and hard guards precede scoring; risk-dependent NEVER follows scoring and
+still outranks CRITICAL. Only `finance.verify_request` maps CRITICAL to VERIFY.
+Missing requester confirmation or unresolved conditions cannot create approvals;
+known-false ordinary conditions can. No grammar expansion was required.
+
+The catalog additionally reserves `governance.pause_automation` and
+`governance.resume_automation`, both LOW, with fixed linked-member permissions and
+app-only resume. Household rules cannot redefine them. Their native boundary rules
+apply to every linked role and cannot be overridden by temporal approvals.
+The provider/sub identity and explicit claimed role must both be permitted.
+
+Native approval history accepts ordered events sharing one second. The Python
+pipeline still enforces the original ASK deadline, current eligible-member quorum,
+channels, single use and policy/fact bindings. Stored seeds are not activated by
+any of these APIs. Per-class count limits, public authentication and AWS comparison
+remain outstanding; see [ADR-003](./adr/ADR-003-constitution-yaml-to-cedar.md#item-9-amendment--2026-09-18).

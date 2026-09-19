@@ -4,15 +4,20 @@ What Hirz protects against, what it explicitly does not, and the assumptions the
 
 An explicit scope boundary is worth more to a technical reviewer than an implied claim of total coverage. **Rule for this file:** every row reads **Planned** until the code that earns it exists and its `verify:` check in `ROADMAP.md` passes; only then does it become the **Yes** or **Partial** it names. "No" rows are design decisions and need no code. Claims never outrun the implementation.
 
+Item 9 earns only the internal durable-grant protections below, backed by
+[the verification evidence](./docs/verification-log.md#item-9--complete-2026-09-18).
+A grant is not device execution (item 19). Public authentication, physical execution,
+AWS enforcement and full ledger verification/anchoring retain their pending claims.
+
 ---
 
 ## Threats
 
 | Threat | Protected? | Notes |
 |---|---|---|
-| Hirz takes an action the household marked `never` | **Planned** (Phase 1; will be Yes) | Constitution `never` is pipeline stage 2, terminal, and compiles to a Cedar `forbid`, which wins over any permit. Two engines must agree before execution, and the `forbid` needs no context facts, so this row is fully independent of Hirz's snapshot |
-| Hirz takes a high-risk action without asking | **Planned** (Phase 1; will be Yes) | Risk floors are code: HIGH → ASK minimum, CRITICAL → never autonomous. A constitution cannot loosen a floor; over-broad `auto` fails activation |
-| Approval reused for a different action (TOCTOU) | **Planned** (Phase 3; will be Yes) | Approvals bind to the action `content_hash`; redemption re-runs the pipeline against current state; mismatch → `DENY_APPROVAL_MISMATCH`; expiry → `DENY_APPROVAL_EXPIRED` |
+| Hirz takes an action the household marked `never` | **Yes for internal grants** (item 9) | Explicit class/role `never` is terminal before scoring and compiles to a Cedar `forbid`. Risk-dependent NEVER also wins, using current supplied facts. Both evaluators must permit before a durable grant; the explicit class/role veto requires no observation facts |
+| Hirz takes a high-risk action without asking | **Yes for internal grants** (item 9) | Risk floors are code: HIGH → ASK minimum, CRITICAL → never autonomous. A constitution cannot loosen a floor; validation rejects over-broad `auto`. Public activation remains pending |
+| Approval reused for a different action (TOCTOU) | **Yes for internal grants** (item 9) | Approvals bind to the action `content_hash`; redemption re-runs the pipeline against current state; mismatch → `DENY_APPROVAL_MISMATCH`; expiry → `DENY_APPROVAL_EXPIRED` |
 | Approval granted under conditions that no longer hold (someone fell asleep, a guest arrived) | **Planned** (Phase 3; will be Yes) | Execution-time re-evaluation; a changed context turns execute into ask and revises the plan |
 | Prompt injection through utterances, calendar titles, contact names, or scenario text | **Planned** (Phase 3; will be Partial) | Model output never decides anything: the pipeline, risk engine, constitution, and executor are code. Injected text can at most distort an explanation or a Protect signal extraction, both of which are schema-validated and, for Protect, weighted by code. What Hirz cannot control is Alexa+'s own orchestrator being manipulated into calling the wrong tool with the wrong arguments; the pipeline then treats that call like any other request from that member |
 | Family-impersonation and organization-impersonation scams relayed by a member (Mom: "Malik called from a strange number and needs money. Is it really him?") | **Planned** (Phase 6; will be Partial) | Hirz verifies against stored verified channels and the subject's own app, never against caller-supplied facts, and has no way to move money (no payment adapter exists, and no money action is offered to the orchestrator). Hirz cannot see the phone call itself, never claims anything about the caller's number unless the member reads it out (and then only "matches your saved record" or "does not", since caller ID can be forged), and depends on the member asking; the contact is asked about the specific request, and a "yes, that was me" is never an endorsement of paying. A model may add signals to the keyword extractor's and can never remove one; a member who acts without asking Hirz is outside its reach. Hirz gives the member one thing to do, ask first; it does not stop scam calls |

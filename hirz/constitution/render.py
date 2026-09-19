@@ -101,7 +101,7 @@ def render(policy: Constitution) -> list[str]:
             )
         if rule.budget:
             lines.append(
-                f"Daily spending cap: {rule.budget.usd_per_day} USD; crossing it is DENY_BUDGET (runtime enforcement pending item 9)."
+                f"Daily spending cap: {rule.budget.usd_per_day} USD; crossing it is DENY_BUDGET (enforced by the internal pipeline)."
             )
         if rule.never_for:
             lines.append(f"Never for: {phrase(rule.never_for)}.")
@@ -118,11 +118,11 @@ def render(policy: Constitution) -> list[str]:
             )
     for interval in policy.quiet_hours:
         lines.append(
-            f"Quiet hours start on {phrase(interval.days)} at {interval.from_time}, end at {interval.to_time} in household local time, include the start and exclude the end, and carry overnight. {phrase(interval.affects)} escalate from auto to ask (runtime enforcement pending item 9)."
+            f"Quiet hours start on {phrase(interval.days)} at {interval.from_time}, end at {interval.to_time} in household local time, include the start and exclude the end, and carry overnight. {phrase(interval.affects)} escalate from auto to ask (enforced by the internal pipeline)."
         )
     lines.extend(
         [
-            f"Requester confirmation required for: {phrase(policy.verification.require_requester_confirmation) or 'none'} (later pipeline enforcement).",
+            f"Requester confirmation required for: {phrase(policy.verification.require_requester_confirmation) or 'none'} (enforced by the internal pipeline).",
             f"Trusted contact methods, in order: {phrase(policy.verification.trusted_contact_methods_order) or 'none'}.",
             f"Memory proposals: {policy.learning.accept_memory_proposals} (later learning enforcement).",
         ]

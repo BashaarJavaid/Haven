@@ -80,7 +80,9 @@ def guards(rule: Rule) -> tuple[tuple[str, str, Decimal], ...]:
     return tuple(result)
 
 
-def resolve(policy: Constitution, action: Action, facts: PolicyFacts) -> RuleOutcome:
+def resolve(
+    policy: Constitution, action: Action, facts: PolicyFacts, *, hard_only: bool = False
+) -> RuleOutcome:
     name, role = action.action_class, action.requested_by.role
     rule = policy.rule(name, role)
     mode = policy.role_mode(name, role)
@@ -114,7 +116,7 @@ def resolve(policy: Constitution, action: Action, facts: PolicyFacts) -> RuleOut
             except FactError as exc:
                 mode = "never"
                 errors.update(exc.paths)
-        for condition in rule.conditions:
+        for condition in () if hard_only else rule.conditions:
             try:
                 conditions_met = (
                     evaluate(parse(condition), values, facts) and conditions_met
@@ -122,7 +124,7 @@ def resolve(policy: Constitution, action: Action, facts: PolicyFacts) -> RuleOut
             except FactError as exc:
                 conditions_met = False
                 errors.update(exc.paths)
-        for override in rule.overrides:
+        for override in () if hard_only else rule.overrides:
             try:
                 if evaluate(parse(override.when), values, facts):
                     if RANK[override.mode] > RANK[mode]:

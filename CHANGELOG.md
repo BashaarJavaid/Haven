@@ -8,6 +8,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 1 item 9: deterministic internal pipeline, durable single-use
+  execution grants, persisted quorum approvals, exact daily budget reservations,
+  and atomic household pause/resume. Signed audit append is pulled forward from
+  item 10; physical execution and public authentication remain later work.
+  [Contract and scope](./ARCHITECTURE.md#34-internal-pipeline-contract-item-9);
+  [verification](./docs/verification-log.md#item-9--complete-2026-09-18).
+
 - 2026-09-18: Phase 1 item 8: standalone deterministic risk scoring, typed facts
   and canonical risk results, catalog freshness thresholds, and a shared floor
   function used by constitution validation. Semantics and boundaries:

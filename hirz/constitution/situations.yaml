@@ -45,3 +45,5 @@ health.medical_decisions: {params: {}}
 communication.notify_member: {params: {}}
 communication.contact_trusted_contact: {params: {}}
 communication.contact_emergency_services: {params: {}}
+governance.pause_automation: {params: {}}
+governance.resume_automation: {params: {}}

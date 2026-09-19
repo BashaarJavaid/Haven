@@ -58,3 +58,13 @@ The scorer's tests prove its arithmetic, fail-closed behavior and floor contract
 not that a running pipeline enforces those floors. Runtime threat-model rows
 remain Planned. The [development procedure](../development.md#standalone-risk-scoring-item-8)
 provides a local API smoke run without any execution or persistence.
+
+## Item 9 amendment — 2026-09-18
+
+The catalog adds reserved LOW-risk pause/resume controls, with no observation or
+spend requirement. Explicit NEVER/hard guards precede scoring; overrides that need
+risk facts resolve afterward, and any resulting NEVER still wins over CRITICAL.
+Only `finance.verify_request` maps CRITICAL to VERIFY, which creates no contact
+operation. Automatic risk inference from names, incomplete occupancy, or ambiguous
+temperature preferences was rejected; the pipeline's extraction contract is in
+[architecture §3.4](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).

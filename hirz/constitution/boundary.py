@@ -146,7 +146,7 @@ class Dogwood:
             for approval in approvals:
                 if (
                     approval.action_class != "governance.approve_action"
-                    or not previous <= approval.timestamp < action.timestamp
+                    or not previous <= approval.timestamp <= action.timestamp
                 ):
                     raise BoundaryError("Invalid approval history order")
                 previous = approval.timestamp

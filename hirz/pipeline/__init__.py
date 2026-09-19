@@ -1,1 +1,1 @@
-"""Canonical pipeline objects. Runtime pipeline is not implemented yet."""
+"""Canonical pipeline models and internal service (import service explicitly)."""

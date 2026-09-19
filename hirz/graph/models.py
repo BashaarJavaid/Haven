@@ -61,6 +61,7 @@ class Location(Model):
 
 
 class Household(Model):
+    autonomy_paused: bool = False
     id: UUID
     name: Text
     timezone: Text

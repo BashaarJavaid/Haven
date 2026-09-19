@@ -94,3 +94,26 @@ policy per class; accepting arbitrary response events without checking their
 approval request; switching engines because the binary was not installed. The
 approved cedarpy fallback was unnecessary because the real Dogwood gate passed.
 Evidence lives only in [the verification log](../verification-log.md#item-7--complete-2026-09-18).
+
+## Item 9 amendment — 2026-09-18
+
+The pipeline takes an explicitly validated/compiled, household-bound policy bundle;
+automatically treating stored seed versions as active was rejected. Identity is
+resolved from household provider/sub links, and linked and explicitly claimed roles
+are intersected in both evaluators. Caller-supplied Action authority is not trusted.
+Fresh graph facts feed both policy and risk; unresolved ordinary conditions cannot
+be approved, while known-false conditions can. Details and precedence are in
+[architecture §3.4](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
+
+Approval bindings include the full policy/artifact identity and initial soft gates,
+not just the content hash. Current quorum and new/stricter gates are checked again at
+redemption; cleared gates do not manufacture a new approval requirement. The native
+wrapper accepts approval-before-action trace order within a single second, retaining
+the Python ASK-creation deadline. Artificially advancing the clock to satisfy the
+old wrapper inequality was rejected: native Dogwood already supports ordered events.
+
+Pause/resume are reserved system permissions with matching local boundary rules,
+so a household override cannot prevent a linked member from pausing or resuming in
+the app. They introduce no grammar expansion. Dollar budgets and quiet hours now
+run in the internal pipeline; per-class counts remain deferred. AWS enforcement,
+authentication and policy activation remain with their original roadmap items.
