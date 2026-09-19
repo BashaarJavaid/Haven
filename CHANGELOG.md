@@ -13,6 +13,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Item 11's read-only `hirz decide` CLI previews stored, unactivated
+  policies using the existing pipeline, explicit hypothetical identity/target
+  inputs and canonical Decision JSON. [Contract and tradeoffs](./docs/adr/ADR-003-constitution-yaml-to-cedar.md#item-11-amendment--2026-09-18-author-approved);
+  [verification and outstanding local invocation](./docs/verification-log.md#item-11--2026-09-18). Item remains partial.
+
 - 2026-09-18: Phase 1 item 10: read-only audit verification, private sequence-range
   exports and offline verification with independently trusted public keys.
   [Contract and tradeoffs](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-10-amendment--2026-09-18-author-approved);

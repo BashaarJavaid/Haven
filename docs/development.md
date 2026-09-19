@@ -137,7 +137,8 @@ household for tests. Bootstrap remains the explicit item 6 exception.
 The [risk contract](../ARCHITECTURE.md#53-risk-engine) accepts a canonical Action,
 typed facts, and its selected validated Rule. This example uses explicitly
 synthetic constitution-preview data; it does not read live observations, access
-the database, approve anything, or act on a device. `hirz decide` remains item 11.
+the database, approve anything, or act on a device. The pipeline CLI is documented
+under [decision preview](#decision-preview-item-11).
 
 Run from the repository root:
 
@@ -208,9 +209,75 @@ Actual output and checks are recorded once in the [item 9 evidence](./verificati
 
 For the real database checks, `uv run --locked pytest -m integration --no-cov` uses
 uniquely named disposable databases, including upgrade/downgrade and metadata agreement.
-The internal service does not expose `hirz decide` (item 11), authentication, activation,
-physical execution (item 19), or AWS enforcement. Audit append is available internally;
+The internal service does not expose authentication, activation,
+physical execution (item 19), or AWS enforcement. Item 11 wraps its read-only
+evaluation in [the CLI](#decision-preview-item-11). Audit append is available internally;
 audit verification/export procedures follow below.
+
+## Decision preview (item 11)
+
+Run from the checkout root with the existing regular mode-0600 `.env`, its original
+P-256 signing key, local PostgreSQL at the existing migration head, and the pinned
+native Dogwood binary. Migrations remain an explicit operator command; `decide`
+never runs them. The household's referenced stored policy must pass current
+validation. [Preserved old seeds](#local-constitution-workflows-item-7) are not
+rewritten or replaced with files from the repository; upgrading the schema alone
+does not repair an invalid policy.
+
+```sh
+export HIRZ_DOGWOOD="$PWD/.tools/dogwood"
+uv run hirz decide --help
+uv run hirz decide \
+  --household 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --as malik --surface alexa --action finance.transfer_money \
+  --adapter household --entity 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --params '{}'
+```
+
+With a valid stored seed this returns `DENY_CONSTITUTION`, with exit 0: the command
+successfully evaluated a forbidden hypothetical action. It moves no money and
+creates no audit row. Policy/configuration/database errors instead exit 1 with
+safe stderr and empty stdout. Invalid command inputs exit 2 without echoing values.
+Stdout is only canonical Decision JSON; stderr labels every returned result as a
+hypothetical preview of an unactivated policy. Even `EXECUTE` grants no authority.
+
+Both demo UUIDs are returned by `hirz seed`; `quinn-parents` is
+`bf745178-9146-5952-a310-f1d7e563977b`. `--as` selects a stored `demo` account subject,
+not a voice or authenticated person. `--surface` is required (`alexa`, `app`, or
+`scheduler`). Action class, adapter, entity and JSON-object params are required;
+`--zone` takes a household HVAC zone UUID. Read actual bindings and zone IDs with
+`hirz context <uuid> --scope all`; no friendly-name inference is performed.
+
+Optional `--cost` is an exact, finite, nonnegative Decimal; omission leaves cost
+unknown, so a budgeted action can deny. `--at` accepts an aware ISO timestamp and
+otherwise uses current UTC. It changes the clock against current graph data, not
+historical state; earlier row versions are not recovered, and stale/missing facts
+still fail closed. Seed files contain no observations, so seeding alone does not
+establish the facts needed for an HVAC or security preview.
+
+Optional `--evidence <file.json>` reads a JSON list of the existing
+`SupplementalEvidence` objects (defined in `hirz/pipeline/models.py`), each with
+explicit `household_id`, aware `observed_at` and `source: "twin"`. Supported facts
+include occupancy completeness, guest presence, bedroom status, price band,
+unexpected visitor, doorbell availability and deterministic scam-pattern evidence.
+Subject-scoped facts retain their subject UUID requirement. Evidence cannot replace
+stored member observations or contradict graph facts. Duplicate keys, invalid
+shapes and noncanonical/nonfinite numbers are rejected. `--requester-confirmed`
+is false unless present; it supplies hypothetical confirmation only. There are no
+approval, passkey, vote, redemption or policy-file controls.
+
+The reproducible nine-case CLI run uses only disposable databases and synthetic
+fixture state; it prints each initial event and verifies unchanged database state:
+
+```sh
+uv run pytest tests/integration/test_decide_database.py -m integration --no-cov -s
+```
+
+It calls the actual argparse dispatch and handler, substituting only database and
+test-key configuration. Native Dogwood, stored policy loading and the pipeline run
+normally. The spending fixture establishes usage with an internal grant, never a
+fabricated audit row or device operation. Actual results and the existing local
+database's prerequisite limitation are recorded in [item 11 evidence](./verification-log.md#item-11--2026-09-18).
 
 ## Audit verification and export (item 10)
 

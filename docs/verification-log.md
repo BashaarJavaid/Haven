@@ -698,3 +698,119 @@ completeness. An empty result proves no historical absence. Anchors and
 `--anchors` remain item 38b; public endpoints/authentication, policy activation,
 physical execution and AWS enforcement remain pending. Item 11 owns `hirz decide`.
 No commit, push, deployment or new GitHub Actions run was performed or claimed.
+
+## Item 11 — 2026-09-18
+
+### Implementation and acceptance evidence
+
+Implemented the approved stored-policy preview CLI, shared constitution text
+loader and nine initial-decision acceptance cases. This entry distinguishes
+successful disposable-database verification from the blocked invocation on the
+existing development database. The command contract lives in
+[development procedures](./development.md#decision-preview-item-11) and
+[architecture §3.5](../ARCHITECTURE.md#35-local-decision-preview-item-11).
+
+Environment: macOS ARM64, Python 3.12.13, pytest 9.1.1, existing local PostgreSQL,
+and the pinned native Dogwood binary at `.tools/dogwood`. Commands used
+`UV_CACHE_DIR=/private/tmp/hirz-uv-cache` and, for native checks,
+`HIRZ_DOGWOOD="$PWD/.tools/dogwood"`. Local socket/database tests used sandbox
+escalation. No new dependency, migration, container, AWS resource or remote CI
+run was needed.
+
+| Command | Observed result |
+|---|---|
+| `uv run --locked pytest tests/unit/test_decide.py --no-cov` | 27 passed in 0.69 s |
+| `uv run --locked pytest` | **557 passed, 47 deselected in 64.94 s; coverage 86.24%**, above the 80% gate |
+| `uv run --locked pytest -m integration --no-cov` | **47 passed, 557 deselected in 37.11 s**, including all 15 new CLI integration checks |
+| `uv run --locked ruff check .` | All checks passed |
+| `uv run --locked ruff format --check .` | 83 files already formatted |
+| `uv run --locked mypy hirz/ scripts/ alembic/` | Success: no issues found in 40 source files |
+
+The focused native run printed these nine actual CLI results (each through
+`hirz.cli.main`, substituting only disposable connection and test-key configuration):
+
+```text
+daytime_hvac: EXECUTE; audit=null; approval=null; database=unchanged
+sleeping_hvac: ASK_CONSTITUTION; audit=null; approval=null; database=unchanged
+teen_unlock: DENY_CONSTITUTION; audit=null; approval=null; database=unchanged
+unexpected_v7: ASK_CONSTITUTION; audit=null; approval=null; database=unchanged
+unexpected_v8: DENY_CONSTITUTION; audit=null; approval=null; database=unchanged
+expected_arrival: ASK_CONSTITUTION; audit=null; approval=null; database=unchanged
+stranger_in_window: ASK_CONSTITUTION; audit=null; approval=null; database=unchanged
+suspicious_request: VERIFY; audit=null; approval=null; database=unchanged
+budget_exceeded: DENY_BUDGET; audit=null; approval=null; database=unchanged
+```
+
+The fixtures used complete synthetic observations with explicit twin labels and
+an unambiguous owner temperature baseline. The teen had an actual stored demo
+account link. v8 was seeded unactivated in its isolated database. The budget
+fixture first committed an actual internal $9.60 grant with a signed audit row,
+then previewed $0.80 against the $10 cap; the preview reserved zero. No device
+operation occurred. Database fingerprints include all application tables, their
+history tables, approvals/votes/actions, audit rows/pointers, constitution versions
+and the materialized household context. The grant setup precedes the fingerprint;
+each subsequent preview leaves it unchanged.
+
+Additional checks exercised the parents' linked account, unknown accounts,
+requester confirmation, pause/resume without mutation, native boundary denial and
+malformed responses, missing and conflicting facts, wrong household/future
+evidence, damaged hashes, wrong policy name/version, invalid/duplicate policy
+YAML, missing native engine, and malformed CLI input/evidence. Error outputs did
+not echo private sentinel inputs. Default decision generation, hashing and all
+pipeline semantics use existing code; no test substituted a Decision.
+
+### Existing development database invocation
+
+Ran the actual installed CLI from the checkout with its existing `.env`:
+
+```sh
+uv run --locked hirz decide \
+  --household 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --as malik --surface alexa --action finance.transfer_money \
+  --adapter household --entity 536fa8ee-854e-56ca-8c5d-5ba418e710a0 \
+  --params '{}'
+```
+
+Exit **1**, empty stdout, stderr:
+
+```text
+Migrations are missing, inconsistent, or behind; run uv run alembic upgrade head from the checkout root.
+```
+
+Read-only follow-up inspection found revision `0002_household_graph`, no pipeline
+tables, two households, zero audit rows, and two stored policies. In-memory parsing
+found **0 valid / 2 invalid** stored policies under the current schema. No policy
+contents or secrets were printed. Applying the existing schema migration alone
+would not repair those policies. The approved scope preserves them and defers
+activation; no development database migration, reset, reseed or policy rewrite
+was performed. A successful Decision from that existing database remains
+unverified; the nine-case acceptance evidence above is from fresh disposable
+fixtures, not those preserved rows.
+
+### Failures corrected and limits
+
+Initial collection caught `TypeError: type '_SubParsersAction' is not subscriptable`;
+postponed annotations fixed the new CLI module. The first focused database run
+passed the nine examples, then a separate confirmation test returned `DENY_RISK`
+because its fixture omitted evidence of guest absence; supplying occupancy
+completeness correctly exposed `ASK_REQUESTER_CONFIRMATION`. The next run passed
+14 checks, then a fixture assumed the parents' seed had an HVAC zone and raised
+`IndexError: list index out of range`; the parents' governance check now uses its
+actual seed without fabricated HVAC assets. The final full integration suite
+passed all 47 checks. These were our implementation/fixture errors, not upstream
+defects. Existing sandbox cache/socket friction was reviewed and recorded as a
+repeat in the friction log.
+
+The author explicitly chose to keep item 11 **partial** on 2026-09-18, pending a
+working invocation on the preserved development database. Passing disposable
+acceptance checks does not close that outstanding local verification.
+
+No public authentication, activation, physical execution, historical replay,
+passkey verification, remote boundary, or new threat-model protection is claimed.
+No commit, push, deployment or new GitHub Actions run was performed.
+
+Final documentation checks: `git diff --check` passed; `.venv/bin/hirz decide
+--help` exited 0 and listed the approved required/optional flags. Ruff and mypy
+were rerun after the edits with the same passing summaries above. Updated Commands
+and Current phase guidance matches in both instruction files (70-word current
+phase); their pre-existing file-specific heading/introduction differences remain.

@@ -117,3 +117,28 @@ so a household override cannot prevent a linked member from pausing or resuming 
 the app. They introduce no grammar expansion. Dollar budgets and quiet hours now
 run in the internal pipeline; per-class counts remain deferred. AWS enforcement,
 authentication and policy activation remain with their original roadmap items.
+
+## Item 11 amendment — 2026-09-18 (author-approved)
+
+The CLI previews the stored policy referenced by the selected demo household,
+validating its stored hash/name/version and compiling in memory. It explicitly
+labels that policy unactivated and leaves stored status unvalidated. This resolves
+item 11's former “active constitution” wording without pulling activation forward.
+The existing pipeline evaluation and canonical Decision remain the only decision
+path. Full command semantics are in [architecture §3.5](../../ARCHITECTURE.md#35-local-decision-preview-item-11).
+
+The author selected explicit household UUID, demo-account subject, surface and
+target flags; typed twin evidence; optional preview time and exact cost; explicit
+hypothetical requester confirmation; canonical JSON stdout and 0/1/2 exit codes.
+The existing signing-key prerequisite remains, avoiding a change to the mutation
+interface. Nine initial action-request decisions replace the ambiguous “eight
+worked examples”; later approval events are outside this CLI.
+
+Rejected alternatives: silently activating or repairing stored seeds; requiring a
+policy-file override; adding activation in Phase 1; defaulting a household or
+inferring targets; pretending a supplied name authenticates a person; historical
+replay; real-labeled caller evidence; interactive approval; custom response shapes
+or outcome-specific exit codes; optional audit writers; new dependencies or
+migrations. Existing invalid stored policies fail without repository-file fallback.
+Local verification uses disposable fixtures, including unactivated v8; no new
+remote CI run is required. [Evidence and local prerequisite limitation](../verification-log.md#item-11--2026-09-18).

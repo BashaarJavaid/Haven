@@ -311,7 +311,12 @@ class Constitution(Model):
 
 
 def load(path: Path) -> Constitution:
-    documents = list(yaml.load_all(path.read_text(), Loader=ConstitutionLoader))
+    return loads(path.read_text())
+
+
+def loads(text: str) -> Constitution:
+    """Parse stored or file-backed policy text through the same validation path."""
+    documents = list(yaml.load_all(text, Loader=ConstitutionLoader))
     if any(not isinstance(doc, dict) for doc in documents):
         raise ValueError("Constitution documents must be mappings")
     if len(documents) == 2:

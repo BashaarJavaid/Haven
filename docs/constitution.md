@@ -391,6 +391,32 @@ in `tests/unit/test_constitution.py` and `tests/cedar_conformance/test_local.py`
 | $9.60 spent + $0.80 proposed under $10 cap | Cap validated/rendered on optimize-cost; evaluator still reports constitution mode | Item 9 must produce DENY_BUDGET, not ASK_BUDGET |
 | Auto access-code-share | Schema validation refuses static CRITICAL `auto` | Runtime floor/pipeline |
 
+### 6.2 Initial decisions verified by item 11
+
+The CLI verifies nine action-request rows from §6, before any approval or contact
+reply. Owner security requests explicitly include hypothetical requester
+confirmation; omitting it returns `ASK_REQUESTER_CONFIRMATION` before an approval
+can be requested, provided earlier gates pass.
+
+| Initial request | Event |
+|---|---|
+| Daytime HVAC, awake target zone | `EXECUTE` |
+| Nighttime HVAC, Mom asleep in target zone | `ASK_CONSTITUTION` |
+| Linked teen unlock | `DENY_CONSTITUTION` |
+| Unexpected visitor, v7 | `ASK_CONSTITUTION` |
+| Unexpected visitor, v8 | `DENY_CONSTITUTION` |
+| Expected arrival inside Mom's window | `ASK_CONSTITUTION` |
+| Stranger inside the same window | `ASK_CONSTITUTION` |
+| Suspicious financial verification request | `VERIFY` |
+| $9.60 used plus $0.80 proposed against $10 cap | `DENY_BUDGET` |
+
+The two window cases supply identical policy-relevant visitor facts; neither
+identifies a person. v8 is an unactivated synthetic fixture, not an activation.
+Voice approval, invalid security channels and static access-code policy validation
+retain their existing checks; approval/rejection, notifications, passkeys and
+execution are not CLI outcomes. The preview contract is
+[architecture §3.5](../ARCHITECTURE.md#35-local-decision-preview-item-11).
+
 ### 7. Local engine contract
 
 `load(Path)` accepts a standalone constitution or the second document of the seed

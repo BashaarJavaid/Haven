@@ -81,7 +81,7 @@ read-only constitution validation, compilation, and preview; native Dogwood setu
 is in `docs/development.md`. Item 8 adds standalone Python risk scoring; its API
 smoke procedure is also in `docs/development.md`. Item 9 adds the internal pipeline API and disposable `scripts/smoke_pipeline.py`
 example; signed append is internal only. Item 10 adds audit verification/export and
-the smoke's `--audit` option; anchors remain item 38b. The other commands below remain target state.
+the smoke's `--audit` option; anchors remain item 38b. Item 11 adds read-only `hirz decide` with explicit hypothetical inputs; its preserved-database invocation remains unverified. The other commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -94,7 +94,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 - `uv run hirz seed constitutions/quinn-home.yaml constitutions/quinn-parents.yaml` — explicit synthetic bootstrap; unchanged seeds are no-ops, evolved households are refused.
 - `uv run hirz context <household-uuid> --scope all` — redacted graph reads; `--scope member --member <uuid>` and timezone-aware `--as-of` are supported. Procedures in `docs/development.md`.
 - `uv run hirz doctor` — four read-only local checks: Postgres, HA demo entities, P-256 signing probe, migration head/table/materialized-view presence. Exit 0 only if all pass; no `--aws` or constitution check yet. Those checks remain target state.
-- `uv run hirz decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
+- `uv run hirz decide --household <uuid> --as malik --surface alexa --action energy.hvac_adjust --adapter twin --entity hvac.living_room --zone <zone-uuid> --params '{"target_f":72}'` — hypothetical preview of a stored, unactivated policy; optional `--cost`, `--at`, `--evidence`, and `--requester-confirmed`. Required observation/evidence setup and exit codes: `docs/development.md`.
 - `uv run hirz scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
 - `uv run hirz verify-audit --household <uuid>` / `uv run hirz audit export --household <uuid> [--range START:END] --output <new-file>` — full-chain verification and private exports. Offline: `hirz verify-audit --household <uuid> --file <export> --public-key <pem>` (or `--trusted-fingerprint <hex>`). `--anchors` remains item 38b; procedures in `docs/development.md`.
 - `docker compose -f compose.link.yml up -d` — Hirz Link beside Home Assistant, in the home (AWS mode).
@@ -111,7 +111,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 and Phase 1 items 6–10 are complete and verified locally; item 11 (`hirz decide`) is next.** Audit verification/export and internal grants pass native Dogwood and PostgreSQL checks; audit tampering protection is Partial without anchors. Stored seeds remain unvalidated; public authentication, activation, physical execution and AWS enforcement are pending. Evidence: `docs/verification-log.md`; procedures: `docs/development.md`. Four CI jobs remain placeholders; item 10 has no new CI run.
+**Phase 0 and Phase 1 items 6–10 are complete; item 11 is implemented but partial.** Its disposable CLI verification passes; a working invocation on the preserved development database remains owed (schema behind, stored policies invalid). Preserve those policies; activation and physical execution remain pending. Next phase starts with item 12 after item 11 closes. Evidence: `docs/verification-log.md`; procedures: `docs/development.md`. Four CI jobs remain placeholders; no new CI run for item 11.
 
 ---
 

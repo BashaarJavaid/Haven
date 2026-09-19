@@ -210,6 +210,39 @@ still cannot grant twice. The smoke procedure is in
 
 ---
 
+### 3.5 Local decision preview (item 11)
+
+`hirz decide` calls `Pipeline.evaluate()` for either seeded demo household. It
+captures the policy referenced by `households.constitution_version`, checks the
+stored YAML hash, household and version, then validates/compiles it in memory with
+native Dogwood. Stored policy status remains **unvalidated**; the command calls
+it **unactivated**, never active. It ends the policy-read transaction before the
+pipeline takes its fresh graph-read lock. This is a preview of the captured policy,
+not an activation or an execution authorization.
+
+The operator explicitly supplies household UUID, demo-account subject, surface,
+class, adapter, entity and JSON parameters, with an optional zone UUID. The pipeline
+resolves the account's stored role; unresolved accounts remain unknown. This is
+hypothetical identity, not authentication. An explicit confirmation flag supplies
+only hypothetical requester confirmation, never a passkey or approval. Optional
+typed supplemental evidence must be labeled `twin` and retains existing scope,
+time and conflict checks. There is no graph, budget, role or policy override input.
+
+The canonical Action receives a generated ID, recomputed hash and fixed preview
+reason; plan, schedule and expected effect remain null. Optional cost is an exact
+nonnegative Decimal, absent means unknown. `--at` changes the evaluation clock
+(default current UTC) against current graph rows; it does not select historical
+policy, membership, graph or budget snapshots. Version/freshness checks still apply.
+
+Stdout is the canonical Decision, including null approval/audit IDs and zero budget
+reservation. Stderr identifies the preview, unactivated policy, evaluation clock,
+simulated supplied evidence and `dogwood-local` boundary. Exit 0 means a Decision
+was returned, including ASK/DENY/VERIFY; invalid CLI input exits 2 and operational
+or policy-loading failures exit 1. Boundary failure during evaluation remains a
+`DENY_BOUNDARY` Decision. The existing signing key is required to construct the
+pipeline, but no audit row, grant, policy or graph change is written. Procedures
+and the complete command are in [development](./docs/development.md#decision-preview-item-11).
+
 ## 4. Canonical objects
 
 Every surface, the audit log, the explainer, and the tests use these shapes. No endpoint invents its own.

@@ -248,8 +248,9 @@ The Python package has a liveness endpoint, local-development bootstrap checks,
 the foundation and versioned household graph managed by Alembic, and `hirz doctor`.
 Item 6 adds explicit demo seeding and redacted current/historical context reads;
 see [graph development procedures](./docs/development.md). The `web` and `mcp-app`
-workspaces still contain import smoke tests only; no decision pipeline or device
-actions exist yet.
+workspaces still contain import smoke tests only. The internal decision pipeline
+and read-only `hirz decide` preview now exist; device execution remains pending.
+See [decision preview prerequisites](./docs/development.md#decision-preview-item-11).
 
 Verified toolchain: Python **3.12.13**, uv **0.12.15**, Node **24.21.0**, and pnpm
 **12.4.2**. Python is selected by `.python-version`; pnpm is recorded in

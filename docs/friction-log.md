@@ -62,6 +62,21 @@ These are repeat environment restrictions, not new upstream defects. References:
 [uv CLI](https://docs.astral.sh/uv/reference/cli/) and the
 [approved canonicalizer](https://github.com/trailofbits/rfc8785.py).
 
+Item 11 follow-up to entries 6 and 8 (2026-09-18): the existing sandbox restrictions
+recurred:
+
+```text
+error: Failed to initialize cache at `/Users/bashaarjavaid/.cache/uv`
+  cause: failed to open file `/Users/bashaarjavaid/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+permission denied while trying to connect to the docker API at unix:///Users/bashaarjavaid/.docker/run/docker.sock
+```
+
+Using `UV_CACHE_DIR=/private/tmp/hirz-uv-cache` resolved the cache restriction;
+authorized escalation allowed local PostgreSQL and socket verification. No Docker
+service change was needed. These are repeats of the existing environment friction,
+not new upstream defects. References: [uv CLI](https://docs.astral.sh/uv/reference/cli/)
+and [Docker context/socket configuration](https://docs.docker.com/engine/manage-resources/contexts/).
+
 ## Candidates (not yet hit)
 
 - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be invoked proactively.
