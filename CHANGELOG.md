@@ -6,6 +6,11 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-09-18: Updated the CI installed-wheel catalog check from 21 to 23 entries
+  to include item 9's pause/resume actions; [verification](./docs/verification-log.md#item-9-ci-build-check--2026-09-18).
+
 ### Added
 
 - 2026-09-18: Phase 1 item 9: deterministic internal pipeline, durable single-use

@@ -557,3 +557,22 @@ unvalidated. Synthetic internal passkey evidence proves no public authentication
 or compromised-worker protection. The global graph lock remains a throughput
 ceiling. A lost commit acknowledgment can leave the caller uncertain, but replay
 cannot grant twice. Threat claims are limited to the tested internal grant path.
+
+### Item 9 CI build check — 2026-09-18
+
+[Run 35407827100](https://github.com/BashaarJavaid/Hirz/actions/runs/35407827100)
+at `f6ed4d0` passed ten jobs; `build` failed with `AssertionError` in
+`Fresh-wheel import and CLI outside the checkout`. Its catalog assertion still
+expected 21 entries; item 9 added `governance.pause_automation` and
+`governance.resume_automation`, and both packaged catalogs contain 23.
+Updated the assertion and its output to 23, matching the existing unit check.
+
+Local verification on macOS/Python 3.12.13: `UV_CACHE_DIR=/private/tmp/hirz-ci-uv-cache uv build`
+built the sdist and wheel. Installed the wheel with `uv pip install` into a fresh
+`/private/tmp/hirz-item9-wheel-smoke` virtual environment and ran the CI import,
+catalog assertion and `hirz --help` from `/private/tmp`, outside the checkout.
+Output: `PASS installed hirz 0.0.0` and
+`PASS packaged catalogs: 23 classes, 23 situation groups`; CLI help exited 0.
+Installation required escalation for the previously documented sandbox cache/DNS
+restrictions. No new third-party defect was found. The change has not been pushed;
+the full GitHub Actions build and its later container checks have not been rerun.
