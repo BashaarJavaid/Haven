@@ -245,9 +245,12 @@ Hirz/
 ## Scaffold setup (Phase 0, items 1–3)
 
 The Python package has a liveness endpoint, local-development bootstrap checks,
-five foundation tables managed by Alembic, and `hirz doctor`. The `web` and
-`mcp-app` workspaces still contain import smoke tests only. There is no household
-application behavior yet.
+the foundation and versioned household graph managed by Alembic, and `hirz doctor`.
+Item 6 adds explicit demo seeding and redacted current/historical context reads;
+see [graph development procedures](./docs/development.md). The `web` and `mcp-app`
+workspaces still contain import smoke tests only. The internal decision pipeline
+and read-only `hirz decide` preview now exist; device execution remains pending.
+See [decision preview prerequisites](./docs/development.md#decision-preview-item-11).
 
 Verified toolchain: Python **3.12.13**, uv **0.12.15**, Node **24.21.0**, and pnpm
 **12.4.2**. Python is selected by `.python-version`; pnpm is recorded in
@@ -266,6 +269,7 @@ From the repository root:
 ```bash
 uv sync --locked
 pnpm install --frozen-lockfile
+# First build/export the pinned Dogwood CLI (docs/development.md, item 7).
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
@@ -279,7 +283,7 @@ uv build
 Default Python tests cover package metadata, liveness, bootstrap credential/protocol
 handling, key recovery, and doctor output/failures. Each TypeScript workspace tests
 its empty module import. Python enforces **80% line coverage over `hirz/`**; scaffold
-coverage is not evidence of household application behavior. No cloud credentials,
+coverage alone is not evidence of policy enforcement or device behavior. No cloud credentials,
 Docker services, or browser are needed for default tests; the WebSocket test binds
 a temporary local port. Live database tests are selected explicitly below.
 
@@ -304,7 +308,7 @@ On GitHub, open **Actions → CI → Run workflow** for manual dispatch.
 Phase 0 item 4 is complete (2026-09-17): all eleven jobs passed in the
 [main run](https://github.com/BashaarJavaid/Hirz/actions/runs/35310102678).
 Green placeholders do not claim application behavior or protection. Item 5
-still requires a second person to follow the README on a clean machine.
+was subsequently completed as recorded in [the roadmap](./ROADMAP.md).
 
 ## Local development stack (Phase 0, items 2–3)
 
@@ -335,7 +339,7 @@ configuration for deployment is deferred.
 |---|---|---|
 | Hirz | <http://localhost:8000/health> | `200 {"status":"ok"}`; process liveness only |
 | Home Assistant | <http://localhost:8123> | Real API, demo devices (**simulated**) |
-| PostgreSQL | `localhost:5432` | Database/user `hirz`; five foundation tables after migration |
+| PostgreSQL | `localhost:5432` | Database/user `hirz`; foundation, graph/history, and context view after migration |
 | Jaeger, optional | <http://localhost:16686> | In-memory traces; no Hirz instrumentation yet |
 
 All published ports bind to `127.0.0.1`. Hirz has no `/ready`, MCP, API docs, worker,
@@ -399,7 +403,7 @@ Compose configuration, or container inspection output containing credentials.
 
 **Local diagnostics and migrations:** `uv run hirz doctor` prints four named
 PASS/FAIL lines for password-authenticated Postgres, HA demo entities, an in-memory
-P-256 sign/verify probe, and migration currency plus the presence of all five tables.
+P-256 sign/verify probe, and migration currency plus the presence of graph tables and `household_context`.
 Each check has a ten-second deadline and no retry. All checks run; exit status is
 0 only if every check passes, otherwise 1. It performs no repairs, migrations,
 audit writes, or device actions. It does not check full schema drift, constitution
@@ -408,9 +412,10 @@ compilation, or AWS yet. There is no `--json` or `--aws` mode in item 3.
 Apply migrations explicitly with `uv run alembic upgrade head`; neither the server
 nor initialization applies them. `uv run alembic check` compares the schema with
 Core metadata for Alembic-supported differences. **`uv run alembic downgrade base`
-destroys all five foundation tables and their data**; use it only on disposable data.
-The initial migration inserts no seed or audit rows. Graph history, repositories,
-seeds, and audit-chain execution belong to later roadmap items.
+destroys the application tables, graph history, and their data**; use it only on disposable data.
+Migrations insert no seed or audit rows. Graph history, repositories, and explicit
+seeding are documented in [development procedures](./docs/development.md);
+audit-chain execution remains item 10.
 
 **Signing-key recovery:** back up `.env` privately. Missing keys are generated only
 for a completely unmigrated database or a consistent migrated schema with no audit

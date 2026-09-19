@@ -1,14 +1,23 @@
-"""Read-only local diagnostics. Run from the checkout root."""
+"""Local diagnostics, synthetic demo bootstrap, and graph reads."""
 
 import argparse
 import asyncio
+import json
+import sys
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 import httpx
 import sqlalchemy as sa
 
+from hirz.audit.cli import add_commands, audit_command, validate_args
+from hirz.constitution.cli import constitution_command
 from hirz.db import connect_database, require_current
+from hirz.graph.context import ContextService
+from hirz.graph.models import SCOPES, GraphError, utc
+from hirz.graph.seeds import load_seeds, read_seed
 from hirz.local import (
     DEMO_ENTITIES,
     HA_URL,
@@ -17,6 +26,7 @@ from hirz.local import (
     read_env,
     signing_key,
 )
+from hirz.pipeline.cli import add_decide, decide_command
 
 
 async def check_postgres(values: dict[str, str]) -> str:
@@ -55,7 +65,7 @@ async def check_key(values: dict[str, str]) -> str:
 async def check_migrations(values: dict[str, str]) -> str:
     async with connect_database(values) as connection:
         await connection.run_sync(require_current)
-    return "database matches the sole Alembic head; five tables present."
+    return "database matches the sole Alembic head; graph tables and household_context present."
 
 
 async def doctor() -> int:
@@ -84,11 +94,83 @@ async def doctor() -> int:
     return int(failed)
 
 
+def aware_timestamp(value: str) -> datetime:
+    try:
+        return utc(datetime.fromisoformat(value))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "Use a timezone-aware ISO-8601 timestamp."
+        ) from None
+
+
+async def graph_command(args: argparse.Namespace) -> int:
+    try:
+        seeds = (
+            [read_seed(path) for path in args.paths] if args.command == "seed" else []
+        )
+        async with connect_database(read_env(Path(".env"))) as connection:
+            if args.command == "seed":
+                result = await load_seeds(connection, seeds)
+                print(json.dumps(result))
+            else:
+                snapshot = await ContextService(connection).get_household_context(
+                    args.household_id,
+                    args.scope,
+                    args.as_of,
+                    args.member,
+                    allow_stale=True,
+                )
+                print(snapshot.model_dump_json())
+        return 0
+    except (GraphError, LocalError) as exc:
+        print(str(exc), file=sys.stderr)
+    except Exception:
+        print(
+            "Graph operation failed; check Postgres, migrations, and seed data. "
+            "Private values and upstream details withheld.",
+            file=sys.stderr,
+        )
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    add_commands(commands)
+    add_decide(commands)
     commands.add_parser(
         "doctor", help="Check local services, signing key, and migrations"
     )
-    parser.parse_args()
-    return asyncio.run(doctor())
+    seed = commands.add_parser("seed", help="Bootstrap the synthetic demo households")
+    seed.add_argument("paths", nargs="+", type=Path)
+    context = commands.add_parser("context", help="Read redacted household context")
+    context.add_argument("household_id", type=UUID)
+    context.add_argument("--scope", choices=SCOPES, default="all")
+    context.add_argument("--member", type=UUID)
+    context.add_argument("--as-of", type=aware_timestamp)
+    constitution = commands.add_parser(
+        "constitution", help="Validate, compile, or preview rules without a database"
+    )
+    operations = constitution.add_subparsers(dest="operation", required=True)
+    for operation in ("validate", "compile"):
+        command = operations.add_parser(operation)
+        command.add_argument("file", type=Path)
+        command.add_argument("--gateway-resource", default="hirz-local")
+    preview = operations.add_parser("preview")
+    preview.add_argument("old", type=Path)
+    preview.add_argument("new", type=Path)
+    args = parser.parse_args()
+    if args.command == "decide":
+        return asyncio.run(decide_command(args))
+    if args.command in {"audit", "verify-audit"}:
+        validate_args(args, parser)
+        return asyncio.run(audit_command(args))
+    if args.command == "constitution":
+        return asyncio.run(constitution_command(args))
+    if args.command == "context" and (args.scope == "member") != (
+        args.member is not None
+    ):
+        parser.error("--member is required only for member scope")
+    if args.command == "doctor":
+        return asyncio.run(doctor())
+    return asyncio.run(graph_command(args))

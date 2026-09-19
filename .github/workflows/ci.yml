@@ -61,6 +61,11 @@ jobs:
           enable-cache: false
       - run: uv python install
       - run: uv sync --locked
+      - name: Build pinned native Dogwood (required)
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          RUSTUP_TOOLCHAIN=1.98.1 uv run --locked python scripts/build_dogwood.py
+          echo "HIRZ_DOGWOOD=$PWD/.tools/dogwood" >> "$GITHUB_ENV"
       - name: Service-free tests and 80 percent coverage gate
         run: uv run --locked pytest
       - name: Initialize disposable PostgreSQL and Home Assistant demo
@@ -153,11 +158,26 @@ jobs:
 
   cedar-conform:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - name: Phase 0 placeholder — policy evaluators not implemented
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install
+      - run: uv sync --locked
+      - name: Build pinned native Dogwood (required)
         run: |
-          echo 'DEFERRED: No boundary or compiler agreement was tested. Item 7 adds local Dogwood and property-based conformance; item 37 adds AgentCore comparison.' | tee -a "$GITHUB_STEP_SUMMARY"
+          rustup toolchain install 1.98.1 --profile minimal
+          RUSTUP_TOOLCHAIN=1.98.1 uv run --locked python scripts/build_dogwood.py
+          echo "HIRZ_DOGWOOD=$PWD/.tools/dogwood" >> "$GITHUB_ENV"
+      - name: Native gate and 200 deterministic examples per property
+        run: uv run --locked pytest tests/cedar_conformance tests/unit/test_constitution.py --no-cov
+      - name: AWS comparison remains item 37
+        run: echo 'Local Dogwood/compiler checks ran; AgentCore comparison is deferred to item 37.' >> "$GITHUB_STEP_SUMMARY"
 
   build:
     runs-on: ubuntu-24.04
@@ -180,6 +200,7 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/wheel-smoke/bin/python" "$wheel"
           cd "$RUNNER_TEMP"
           ./wheel-smoke/bin/python -c 'import hirz; from importlib.metadata import version; print("PASS installed hirz", version("hirz"))'
+          ./wheel-smoke/bin/python -c 'from hirz.risk import CLASSES; from hirz.constitution.preview import SITUATIONS; assert len(CLASSES) == len(SITUATIONS) == 23; print("PASS packaged catalogs: 23 classes, 23 situation groups")'
           ./wheel-smoke/bin/hirz --help
       - run: docker build --tag hirz-ci:check .
       - name: Container runs as the existing unprivileged user

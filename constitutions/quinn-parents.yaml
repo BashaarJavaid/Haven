@@ -1,0 +1,199 @@
+# Synthetic demo bootstrap. Graph first; unvalidated constitution second.
+household:
+  slug: quinn-parents
+  name: Mom and Dad's home
+  timezone: America/Chicago
+  locale: en-US
+  rate_plan: twin
+  location:
+    latitude: 41.88
+    longitude: -87.63
+    source: twin
+members:
+- id: mom
+  display_name: Mom
+  role: owner
+- id: dad
+  display_name: Dad
+  role: adult
+member_accounts:
+- provider: demo
+  sub: mom
+  member_id: mom
+- provider: demo
+  sub: dad
+  member_id: dad
+trusted_contacts:
+- id: malik
+  display_name: Malik
+  relationship: son
+contact_channels:
+- id: malik_app
+  contact_id: malik
+  kind: hirz_app
+  value_hash: 85bad9c9da8e7177563f5370d448782c78181ead30118e5694deb7623962fa2c
+  source: twin
+assets:
+- id: lock.front_door
+  name: Front door lock
+  kind: lock
+- id: doorbell.front_door
+  name: Front doorbell
+  kind: doorbell
+asset_bindings:
+- id: lock.front_door
+  asset_id: lock.front_door
+  adapter: twin
+  entity_id: lock.front_door
+- id: doorbell.front_door
+  asset_id: doorbell.front_door
+  adapter: twin
+  entity_id: doorbell.front_door
+---
+autonomy:
+  communication:
+    contact_emergency_services:
+      mode: ask
+      quorum: any_adult
+    contact_trusted_contact:
+      mode: auto
+    notify_member:
+      mode: auto
+  energy:
+    appliance_start:
+      conditions:
+      - context.hour >= 7 and context.hour < 22
+      mode: auto
+      overrides:
+      - mode: ask
+        when: context.hour >= 22 or context.hour < 7
+    battery_dispatch:
+      mode: auto
+    ev_charge:
+      conditions:
+      - asset.policy.needed_by is set
+      mode: auto
+    hvac_adjust:
+      bounds:
+        max_f: 76
+        min_f: 66
+      conditions:
+      - not occupancy.sleeping_in(action.target.zone)
+      mode: auto
+      overrides:
+      - mode: ask
+        when: occupancy.sleeping_in(action.target.zone)
+    optimize_cost:
+      bounds:
+        ev_soc_floor: 0.3
+      budget:
+        usd_per_day: 10
+      mode: auto
+  environment:
+    comfort_profile:
+      mode: auto
+    lights:
+      mode: auto
+    shades:
+      mode: auto
+  finance:
+    change_payee:
+      mode: never
+    transfer_money:
+      mode: never
+    verify_request:
+      mode: auto
+  health:
+    comfort_preferences:
+      mode: auto
+    medical_decisions:
+      mode: never
+    routine_reminders:
+      mode: auto
+  security:
+    access_code_share:
+      ask_channels: [app_push]
+      mode: never
+    arm_disarm:
+      ask_channels:
+      - app_push
+      mode: ask
+    camera_disable:
+      ask_channels:
+      - app_push
+      max_minutes: 120
+      mode: ask
+      quorum: owner
+    door_unlock:
+      allowed_requesters:
+      - owner
+      - adult
+      ask_channels:
+      - app_push
+      max_open_minutes: 10
+      mode: ask
+      never_for:
+      - unexpected_visitor
+      quorum: any_adult
+defaults:
+  approval_ttl_minutes: 30
+  ask_channels:
+  - alexa
+  - app_push
+  unlisted_class: ask
+household: quinn-parents
+learning:
+  accept_memory_proposals: manual
+per_role:
+  child:
+    '*':
+      mode: never
+  guest:
+    '*':
+      mode: never
+    environment.lights:
+      mode: auto
+  teen:
+    energy.hvac_adjust:
+      mode: ask
+    security.door_unlock:
+      mode: never
+  unknown:
+    '*':
+      mode: never
+quiet_hours:
+- affects:
+  - appliance_start
+  - lights
+  days:
+  - mon
+  - tue
+  - wed
+  - thu
+  - sun
+  from: '22:30'
+  to: 06:30
+roles:
+  adult: {}
+  caregiver:
+    inherits: adult
+    limited_to:
+    - environment
+    - health
+    - communication
+  child: {}
+  guest: {}
+  owner:
+    inherits: adult
+  teen: {}
+  unknown: {}
+verification:
+  require_requester_confirmation:
+  - security.door_unlock
+  - security.camera_disable
+  trusted_contact_methods_order:
+  - app_confirmation
+  - verified_callback
+  - safe_word
+  - verified_email
+version: 1

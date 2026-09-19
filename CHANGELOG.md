@@ -6,7 +6,72 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-09-18: Quantized graph numeric policy facts to four decimal places before
+  strict Cedar range validation, preserving float storage and observation no-ops;
+  [verification](./docs/verification-log.md#graph-policy-fact-quantization--2026-09-18).
+
+- 2026-09-18: Missing HVAC baselines skip deviation scoring without weakening
+  other required facts ([ADR-004 amendment](./docs/adr/ADR-004-no-ml-risk-scoring.md#missing-hvac-baseline-amendment--2026-09-18-author-approved));
+  pipeline and boundary failure logs include the exception class without payloads
+  ([verification](./docs/verification-log.md#missing-hvac-baseline-and-exception-class-logging--2026-09-18)).
+
+- 2026-09-18: Closed item 11 after the authorized empty-audit development schema
+  reset and reseed; [verification](./docs/verification-log.md#development-database-reset-and-phase-1-review--2026-09-18).
+- 2026-09-18: Phase 1 review: tests discover the local Dogwood binary, pipeline
+  and boundary failures log operation context, and unused `Household.budgets` is
+  removed so budgets remain in constitution rules; documented the activation
+  migration prerequisite and audit-clock failure mode.
+
+- 2026-09-18: Updated the CI installed-wheel catalog check from 21 to 23 entries
+  to include item 9's pause/resume actions; [verification](./docs/verification-log.md#item-9-ci-build-check--2026-09-18).
+
 ### Added
+
+- 2026-09-18: Recorded plan-approver authority for scheduled actions and autonomous
+  re-plans, with an execution prohibition for unapproved plans;
+  [author-approved ADR-005 amendment](./docs/adr/ADR-005-deterministic-planner.md#scheduled-action-authority-amendment--2026-09-18-author-approved).
+- 2026-09-18: Extended [roadmap item 12](./ROADMAP.md) with graph homes for Phase 2
+  facts and the requirement to translate CLI evidence into in-memory observations.
+
+- 2026-09-18: Item 11's read-only `hirz decide` CLI previews stored, unactivated
+  policies using the existing pipeline, explicit hypothetical identity/target
+  inputs and canonical Decision JSON. [Contract and tradeoffs](./docs/adr/ADR-003-constitution-yaml-to-cedar.md#item-11-amendment--2026-09-18-author-approved);
+  [verification](./docs/verification-log.md#item-11--2026-09-18).
+
+- 2026-09-18: Phase 1 item 10: read-only audit verification, private sequence-range
+  exports and offline verification with independently trusted public keys.
+  [Contract and tradeoffs](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-10-amendment--2026-09-18-author-approved);
+  [verification and limitations](./docs/verification-log.md#item-10--complete-2026-09-18).
+
+- 2026-09-18: Phase 1 item 9: deterministic internal pipeline, durable single-use
+  execution grants, persisted quorum approvals, exact daily budget reservations,
+  and atomic household pause/resume. Signed audit append is pulled forward from
+  item 10; physical execution and public authentication remain later work.
+  [Contract and scope](./ARCHITECTURE.md#34-internal-pipeline-contract-item-9);
+  [verification](./docs/verification-log.md#item-9--complete-2026-09-18).
+
+- 2026-09-18: Phase 1 item 8: standalone deterministic risk scoring, typed facts
+  and canonical risk results, catalog freshness thresholds, and a shared floor
+  function used by constitution validation. Semantics and boundaries:
+  [ADR-004](./docs/adr/ADR-004-no-ml-risk-scoring.md#item-8-amendment--2026-09-18-author-approved);
+  checks and API output: [item 8 evidence](./docs/verification-log.md#item-8--complete-2026-09-18).
+
+- 2026-09-18: Phase 1 item 7: validated constitution engine, canonical Action,
+  deterministic English/situation preview, native Dogwood compiler and local
+  boundary, and database-free `constitution validate|compile|preview` commands.
+  Required local conformance replaces the CI placeholder; the pinned binary ships
+  in the non-root container. Corrected seed files preserve existing stored history.
+  Semantics: [ADR-003](./docs/adr/ADR-003-constitution-yaml-to-cedar.md#item-7-amendment--2026-09-18-author-approved-semantics);
+  validation and limits: [item 7 evidence](./docs/verification-log.md#item-7--complete-2026-09-18).
+
+- 2026-09-18: Phase 1 item 6: versioned Household Graph, household-scoped repositories,
+  redacted current/historical context, and explicit two-household demo bootstrap
+  with `hirz seed` / `hirz context`. Constitutions remain unvalidated; the bootstrap
+  exception and storage tradeoffs are recorded in [ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-6-amendment--2026-09-18-author-approved).
+  Operating procedures: [development](./docs/development.md); validation:
+  [item 6 evidence](./docs/verification-log.md#item-6--complete-2026-09-18).
 
 - 2026-09-18: Phase 0 item 5 complete: a second person followed the README on a clean machine (reported by the author; evidence entry in `docs/verification-log.md`). Phase 0 is done; Phase 1 item 6 is next.
 - 2026-09-18: `docs/verification-log.md` holds the full verification evidence per roadmap item; the Phase 0 paragraphs moved there verbatim and `ROADMAP.md` keeps one sentence per item with a link. `CLAUDE.md`/`AGENTS.md` gain a "Where records go" table (one home per kind of record) and a shorter "Current phase".

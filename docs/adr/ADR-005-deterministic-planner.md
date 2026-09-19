@@ -19,3 +19,27 @@
 - *Rule-based scheduling (charge in cheapest slots).* Kept as the heuristic fallback; rejected as the primary because it cannot trade comfort against cost or respect coupled constraints.
 
 **Consequences:** Every physical parameter (charger kW, battery kWh, zone R and C) is a knob in the household graph and the scenario file because real hardware never matches the model on paper; the planner exposes `optimality_gap` and the executor's verify-after-act feeds deviations back as re-plan triggers.
+
+## Scheduled action authority amendment — 2026-09-18 (author-approved)
+
+**Decision:** A scheduled action carries `requested_by` of the member who approved
+its plan, with `surface: scheduler`. A plan nobody approved does not execute.
+An autonomous re-plan inherits the approving member of the plan it supersedes.
+Scheduled actions never run as `unknown` or a synthetic system identity.
+Households can tighten scheduled behaviour with `requester.surface == "scheduler"`
+conditions, which the existing grammar already supports. Implementation belongs
+to roadmap item 19.
+
+**Reasoning:** Authority must trace to a person for the audit row and the boundary's
+`requester_role` input; a plan approval is exactly that trace. Scheduling or
+re-planning does not create a new source of authority, and execution-time pipeline
+re-evaluation still applies.
+
+**Rejected alternatives:**
+
+- *Run as the household owner:* substitutes the owner's authority for the actual
+  approver's and misattributes the action.
+- *Run as a system role:* invents authority without a person and requires a new
+  policy role outside the household's existing member rules.
+- *Run as unknown and rely on auto rules:* loses the approval trace and is denied
+  by the seeds' `per_role.unknown: '*': never`; auto rules cannot override that veto.

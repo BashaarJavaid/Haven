@@ -1,7 +1,17 @@
 FROM ghcr.io/astral-sh/uv:0.12.15@sha256:62f8c047d0a0e9ece6b53fc63df902585a67a47a7f318ddec4a37db586edc8e3 AS uv
+FROM rust:1.98.1-slim-bookworm@sha256:ebd900bae66fd508b466cef82d64a83a5fb34682e4c8b2797a42908bddc95a57 AS dogwood
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN git init --quiet && git fetch --depth=1 https://github.com/dogwood-policy/dogwood.git 996d756de1013b7ae209a14f566a80375a59f2f0 \
+    && git checkout --detach FETCH_HEAD
+COPY scripts/dogwood.Cargo.lock Cargo.lock
+RUN cargo build --locked --release -p dogwood-cli
+
 FROM python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 
 COPY --from=uv /uv /usr/local/bin/uv
+COPY --from=dogwood /build/target/release/dogwood /usr/local/bin/dogwood
 WORKDIR /app
 ENV UV_PYTHON_DOWNLOADS=never \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -20,3 +20,11 @@
 - *DynamoDB for the key store.* Works; Parameter Store is free at this scale and one fewer resource.
 
 **Consequences:** One new Lambda with a function URL and a handful of free-tier parameters, pay-per-use, approved by the author on 2026-09-17. The threat-model row will be **Partial**, not Yes: the approval page is still served by Hirz, so a compromised worker could show one request while asking the passkey to sign another. Serving that page from static hosting the worker cannot change is a Phase 9 item. `auto` classes are unaffected and remain exposed to false context facts by design. Adversarial tests: no assertion, a forged one, one over a different hash, and one from a revoked key each produce no approval event and no signature; the worker's role cannot write a key.
+
+## Item 9 scope note — 2026-09-18
+
+Internal pipeline security votes require app surface and trusted verification
+evidence bound to the action hash. Tests supply synthetic evidence explicitly.
+This is not public WebAuthn authentication, registration, or signer-side passkey
+verification, and it earns none of item 38d's compromised-worker claim. Accepting
+voice votes or calling a trusted Boolean a verified public passkey was rejected.

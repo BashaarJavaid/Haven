@@ -24,12 +24,64 @@ Candidates are things expected to bite that have not been hit yet; they move up 
 
 An earlier entry dated 2026-09-15 about unreachable design-guide links was removed on 2026-09-17: the pages loaded on 2026-09-16, and the entry had no URL and no HTTP status, so it did not meet this file's own rule.
 
+| 8 | 2026-09-18 | GitHub lookup in the agent network sandbox | Fetch the pinned Dogwood CLI source for item 7 | Cloned [Dogwood revision 996d756](https://github.com/dogwood-policy/dogwood/tree/996d756de1013b7ae209a14f566a80375a59f2f0) | Read upstream source | `fatal: unable to access 'https://github.com/dogwood-policy/dogwood.git/': Could not resolve host: github.com` | Minor | Authorized read-only network escalation succeeded; checked out the exact revision in temporary storage. This is a sandbox DNS restriction, not a Dogwood defect. | Distinguish sandbox network failures from upstream defects |
+
+| 9 | 2026-09-18 | Dogwood source build | Build the pinned native CLI reproducibly | Ran Cargo with `--locked` at [revision 996d756](https://github.com/dogwood-policy/dogwood/tree/996d756de1013b7ae209a14f566a80375a59f2f0) | Use an upstream dependency lock | `error: cannot create the lock file /private/tmp/hirz-item7-dogwood/Cargo.lock because --locked was passed to prevent this` | Minor | Built once without `--locked`, retained the generated `scripts/dogwood.Cargo.lock`, and use it for subsequent native/container builds. The source revision has no lockfile; this is packaging friction, not a temporal-semantics failure. | Publish a CLI dependency lock alongside pinned releases |
+
+Item 8 follow-up to entry 6 (2026-09-18): `uv run --locked ruff format` hit:
+
+```text
+error: Failed to initialize cache at `/Users/bashaarjavaid/.cache/uv`
+  cause: failed to open file `/Users/bashaarjavaid/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+```
+
+Using `UV_CACHE_DIR=/private/tmp/hirz-uv-cache` let the same command pass without
+escalation. This is the same sandbox restriction, not a new upstream defect;
+the [uv CLI reference](https://docs.astral.sh/uv/reference/cli/) is the tool reference.
+The full pytest run also hit entry 6's existing loopback restriction:
+`PermissionError: [Errno 1] error while attempting to bind on address ('127.0.0.1', 0): [errno 1] operation not permitted`.
+The suite was rerun with sandbox escalation for those disposable local sockets.
+
+Item 9 follow-up to entries 6 and 8 (2026-09-18): adding the approved
+`rfc8785==0.1.4` dependency first hit the same uv cache permission error quoted
+above. A temporary cache then reached the sandbox DNS restriction:
+
+```text
+error: Request failed after 3 retries in 4.1s
+  cause: Failed to fetch: `https://pypi.org/simple/pydantic/`
+  cause: error sending request for url (https://pypi.org/simple/pydantic/)
+  cause: client error (Connect)
+  cause: dns error
+  cause: failed to lookup address information: nodename nor servname provided, or not known
+```
+
+Authorized escalation installed the pinned dependency and updated the lockfile.
+The first PostgreSQL test attempt hit `connection to server at "127.0.0.1", port 5432 failed: Operation not permitted`;
+the disposable-database tests and local socket tests passed with escalation.
+These are repeat environment restrictions, not new upstream defects. References:
+[uv CLI](https://docs.astral.sh/uv/reference/cli/) and the
+[approved canonicalizer](https://github.com/trailofbits/rfc8785.py).
+
+Item 11 follow-up to entries 6 and 8 (2026-09-18): the existing sandbox restrictions
+recurred:
+
+```text
+error: Failed to initialize cache at `/Users/bashaarjavaid/.cache/uv`
+  cause: failed to open file `/Users/bashaarjavaid/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+permission denied while trying to connect to the docker API at unix:///Users/bashaarjavaid/.docker/run/docker.sock
+```
+
+Using `UV_CACHE_DIR=/private/tmp/hirz-uv-cache` resolved the cache restriction;
+authorized escalation allowed local PostgreSQL and socket verification. No Docker
+service change was needed. These are repeats of the existing environment friction,
+not new upstream defects. References: [uv CLI](https://docs.astral.sh/uv/reference/cli/)
+and [Docker context/socket configuration](https://docs.docker.com/engine/manage-resources/contexts/).
+
 ## Candidates (not yet hit)
 
 - No documented way for an add-on to receive Alexa-side context (device modality, locale, timezone) or to be invoked proactively.
 - AgentCore Runtime serves the Protected Resource Metadata at a path-shaped URL under the runtime ARN; whether Alexa's client follows `resource_metadata` from `WWW-Authenticate` or only looks at the origin root is unverified.
 - AgentCore Policy temporal quotas (25 policies per engine, 3 operators per policy, 24-hour window) versus a constitution's `ask` classes; changing temporal policies returns 409 on open sessions. Designed around with one generic temporal permit per TTL.
-- Dogwood CLI: documented subcommands (`validate`, `replay`, `lower`, `check-parse`) and a Rust `Authorizer`, no Python bindings; whether the CLI accepts a schema, entities, and an event trace from a subprocess and returns a decision per request is unverified until `ROADMAP.md` item 7.
 - AgentCore Runtime cold start: a new session is a fresh microVM, so the first Alexa call after an idle gap cannot meet the 500 ms round-trip requirement; measure and record the figure in Phase 7 (`ROADMAP.md` item 38). Related: the Runtime exposes only the invocation path, so the companion API and Ring webhooks needed a separate always-on service (ADR-008).
 - No local library performs Cedar automated-reasoning analysis (always-allow, never-satisfiable); `cedarpy` evaluates only. The analysis exists in AgentCore Policy via `validationMode` on create/update, so it is AWS-mode only.
 - Ring sandbox: webhook signature details and synthetic-device event coverage; whether sandbox credentials are issued without a physical Ring device (the getting-started page lists "at least one Ring device for testing" as a prerequisite); partner-initiated OAuth is invitation-only, so the linking flow is the Ring-driven HMAC-nonce pattern.

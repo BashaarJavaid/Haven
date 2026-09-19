@@ -71,6 +71,13 @@ A scenario can inject an inbound-call event with a presented number and a transc
 
 ## 3. Scenario DSL
 
+The item 6 seed files use two YAML documents (graph, then unvalidated constitution).
+They bind every initial asset to `twin` and contain no observations; a scenario
+must supply its `initial` state and adapter overrides when item 16 implements the
+runner. The seeded arrival window is schedule context only and never evidence of
+visitor identity. Loader details are in [development procedures](./development.md).
+
+
 Two scenarios carry the demo. They are separate files on purpose: a scenario describes one household, and the DSL is not extended to span two.
 
 **`scenarios/parents-scam-check.yaml`** (the cold open, Mom and Dad's home):
@@ -188,6 +195,8 @@ Scenario runs are recorded (`scenario_runs`) with the seed, the adapter mix, and
 ---
 
 ## 5. Labeling
+
+Twin observation outputs used as numeric policy facts are quantized to four decimal places on write by graph validation, the same as real observations.
 
 Every observation carries `source`, one of three values. `real`: a live feed or a physical device (Open-Meteo, the ComEd hourly feed, the smart plug through Home Assistant, Smartcar, Ring sandbox events). `real API, demo devices`: Home Assistant's demo integration, a real API over simulated entities, never shown as plain `real`. `twin`: Hirz's own models. A published rate table is `real (published ComEd rate)`: real prices, not a live feed.
 

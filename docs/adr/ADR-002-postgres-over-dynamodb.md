@@ -33,3 +33,117 @@ and exports must be household-scoped. Audit execution remains item 10. Graph
 history columns, repositories, and seeds remain item 6; this migration does not
 claim historical graph reads. Migrations are explicitly invoked and have a
 reversible, destructive downgrade tested only against disposable databases.
+
+## Item 6 amendment — 2026-09-18 (author-approved)
+
+The graph uses current tables under stable identity keys plus matching history
+tables, with UTC half-open `valid_from`/`valid_to` intervals. Separate identity
+and version tables were rejected because the foundation already supplies the
+foreign keys. History describes what was recorded then, not retroactive effective
+time: backdated household changes are refused, expected `valid_from` tokens
+prevent lost updates, unchanged writes are no-ops, and changed versions of one
+entity cannot share an instant. Deletion/tombstones and bitemporal corrections
+were explicitly deferred. Existing rows begin history at migration time; unknown
+rate plans and location remain unknown rather than invented.
+
+Current context reads use `household_context`; historical reads reconstruct from
+current/history tables in one query. Materializing every historical snapshot was
+rejected to avoid duplicated snapshots and repeated history rebuilds. Writers
+serialize before mutation and refresh once in the same transaction. A plain
+refresh was chosen over concurrent refresh for this small graph; it replaces the
+whole view and can block readers ([PostgreSQL 16 refresh contract](https://www.postgresql.org/docs/16/sql-refreshmaterializedview.html)).
+The global lock and refresh are a documented ceiling, not a claim of scaled
+throughput. Daily observation-history partitions are deferred until ingestion
+volume warrants their maintenance, rather than adding a partition scheduler now.
+
+Item 6 has an explicit **synthetic bootstrap exception** before the pipeline and
+signed audit writer exist. The local seed command initializes only `quinn-home`
+and `quinn-parents`, with `demo` account links and twin asset bindings; repository
+writes are otherwise exercised only in tests. No device action, policy activation,
+runtime mutation endpoint, or fabricated audit event is authorized by this
+exception. Existing/evolved households are never reset. Constitution versions
+are persisted unvalidated, with no compiled policy or activation timestamp;
+item 7 owns semantic validation. Multi-document YAML preserves the constitution's
+specified top-level shape; nested wrappers and separate graph files were rejected.
+
+The complete graph entity set is implemented now, including `shade` to reconcile
+§5.1 with the existing device/context specs. Five graph-backed context scopes ship;
+planner/constraint/security summaries, passkeys, adapters, and rule evaluation
+remain with their owning items. Public snapshots exclude account subjects,
+channel values/hashes, and safe-word hashes at the SQL projection; private reads
+stay in explicitly household-scoped repositories. Only availability failures may
+serve a process-local cached current snapshot, with an explicit read-only opt-in
+and stale labeling. Historical reads and decision callers fail closed.
+
+The approved synthetic contents and loader contract are documented in
+[the constitution spec](../constitution.md#21-action-classes) and
+[development procedures](../development.md). They grant Malik no membership or
+login in his parents' home. The decisions in this amendment supersede only the
+corresponding graph target-state details; threat-model rows remain unearned.
+
+## Item 9 amendment — 2026-09-18
+
+The approved internal pipeline uses three additional household-scoped tables:
+`actions` (immutable proposal/requester/cost and grant reference), `approvals`, and
+`approval_votes`. Decisions and dollar reservations stay in the signed audit ledger;
+separate decision, budget-counter and execution-queue tables were rejected as
+unnecessary. The existing graph transaction lock precedes approval and audit pointer
+row locks, so single redemption, budget reservation and graph changes commit together.
+The global serialization ceiling remains intentional pending measured contention.
+
+The signed append primitive is pulled forward from item 10 because an item 9 grant
+cannot safely commit without its audit row. The verifier, export and 100-concurrent-
+decision gate stay in item 10. “One execution” in item 9's existing verification
+sentence means **one durable execution authorization**, not device actuation; the
+executor remains item 19. Dollar estimates reserve on grant; settlement/refunds and
+per-class action-count limits are explicitly deferred. A second counter subsystem
+or pretending that an ASK reserved spend was rejected.
+
+Canonicalization uses the approved [Trail of Bits RFC 8785 implementation](https://github.com/trailofbits/rfc8785.py),
+not `canonicaljson` (which was incorrectly named as RFC 8785). Exact envelope and
+hashing contracts are in [architecture §3.4 and §5.10](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
+Neither migrations nor the pipeline initialize or replace signing credentials.
+
+## Item 10 amendment — 2026-09-18 (author-approved)
+
+Keep the item 9 writer in place and implement the independent read path under
+`hirz.audit`, sharing the canonical AuditEvent and existing RFC 8785 hashing.
+Verification never re-runs policy. A read-only `REPEATABLE READ` transaction keeps
+the household, pointer and streamed rows in one snapshot while appends continue;
+PostgreSQL documents that successive reads see the same snapshot and read-only
+transactions at this isolation level do not incur serialization conflicts
+([PostgreSQL 16](https://www.postgresql.org/docs/16/transaction-iso.html#XACT-REPEATABLE-READ)).
+No migration, dependency or writer-lock change is needed.
+
+Commands select one explicit household. Exports first verify the full chain, then
+include only an inclusive sequence interval in a versioned JSON file. The caller
+supplies an independent public key or fingerprint for offline verification; an
+embedded key alone is not a trust root. Database commands may derive the public
+key from the existing validated local key. The exact format and verification
+contract live in [architecture §5.10](../../ARCHITECTURE.md#510-audit-ledger).
+
+Alternatives rejected:
+
+- All-household defaults and time-range selectors: explicit household and sequence
+  numbers directly match the existing chain and avoid additional selection modes.
+- Prefix-inclusive exports: disclose history outside the requested interval. A
+  selected-range export instead states precisely which links it can verify.
+- File-only trust or automatic acceptance of an embedded key: could accept an
+  attacker's replacement key and rewritten history. PEM-only verification was
+  rejected in favor of also accepting an independently obtained fingerprint.
+- Selected-range-only database checks: could export evidence from a household
+  whose wider chain is already known to be corrupted.
+- JSON Lines, stdout exports and fully streamed JSON publication: not needed for
+  the current household workload. Selected rows occupy memory; stream publication
+  if measured export sizes outgrow RAM. Exclusive private file creation avoids
+  overwriting another file or relying on shell redirection permissions.
+- Moving the writer or adding key rotation, signed export manifests, or anchors:
+  unnecessary to this item. The current one-key chain contract stays unchanged;
+  S3 anchors remain item 38b.
+
+The concurrency gate launches 100 distinct pipeline proposals with a 20-connection
+pool cap; the existing global transaction lock remains intentional. This tests
+contiguity under concurrent requests, not 100 simultaneous database writers or a
+throughput target. Signature/link checks earn only a Partial tampering claim:
+tail-and-pointer rollback, complete erasure and a compromised worker re-signing
+history remain undetectable without independently held evidence.

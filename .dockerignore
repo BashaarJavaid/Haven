@@ -4,6 +4,8 @@
 !uv.lock
 !README.md
 !LICENSE
+!scripts/
+!scripts/dogwood.Cargo.lock
 !hirz/
 !hirz/**
 **/__pycache__/

@@ -22,3 +22,6 @@ data/postgres/
 cdk.out/
 .agentcore/
 tests/benchmarks/reports/
+
+.tools/
+.hypothesis/

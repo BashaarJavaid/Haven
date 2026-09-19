@@ -1,0 +1,49 @@
+energy.optimize_cost:
+  params: {ev_soc_floor: 0.30}
+  cases:
+    - {label: Below EV reserve, params: {ev_soc_floor: 0.2999}}
+energy.ev_charge:
+  params: {}
+  cases:
+    - {label: No departure time, values: {asset: {policy: {needed_by: null}}}}
+    - {label: Unknown departure time, values: {asset: {}}}
+energy.battery_dispatch: {params: {}}
+energy.hvac_adjust:
+  params: {target_f: 72}
+  cases:
+    - {label: Below temperature bound, params: {target_f: 65.9999}}
+    - {label: Above temperature bound, params: {target_f: 76.0001}}
+    - {label: Someone asleep in target zone, values: {occupancy: {members: [{member_id: resident, zone_id: living_room, present: true, sleeping: true}]}}}
+    - {label: Unknown occupancy, values: {occupancy: {}}}
+energy.appliance_start:
+  params: {}
+  cases:
+    - {label: Late appliance request, values: {context: {hour: 23, time: '23:00'}}}
+environment.lights: {params: {}}
+environment.comfort_profile: {params: {}}
+environment.shades: {params: {}}
+security.door_unlock:
+  params: {open_minutes: 10}
+  owner_label: Expected arrival
+  caveat: Hirz does not identify the visitor
+  cases:
+    - {label: Unexpected visitor, values: {context: {unexpected_visitor: true}}}
+    - {label: Excess open duration, params: {open_minutes: 10.0001}}
+    - {label: Unknown visitor context, values: {context: {}}}
+security.camera_disable:
+  params: {minutes: 120}
+  cases:
+    - {label: Excess camera duration, params: {minutes: 120.0001}}
+security.access_code_share: {params: {}}
+security.arm_disarm: {params: {}}
+finance.transfer_money: {params: {}}
+finance.change_payee: {params: {}}
+finance.verify_request: {params: {}}
+health.comfort_preferences: {params: {}}
+health.routine_reminders: {params: {}}
+health.medical_decisions: {params: {}}
+communication.notify_member: {params: {}}
+communication.contact_trusted_contact: {params: {}}
+communication.contact_emergency_services: {params: {}}
+governance.pause_automation: {params: {}}
+governance.resume_automation: {params: {}}
