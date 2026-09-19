@@ -576,3 +576,125 @@ Output: `PASS installed hirz 0.0.0` and
 Installation required escalation for the previously documented sandbox cache/DNS
 restrictions. No new third-party defect was found. The change has not been pushed;
 the full GitHub Actions build and its later container checks have not been rerun.
+
+## Item 10 — Complete (2026-09-18)
+
+### Scope and environment
+
+Implemented the author-approved audit verifier/export contract in
+[architecture §5.10](../ARCHITECTURE.md#510-audit-ledger), with choices and rejected
+alternatives in [ADR-002](./adr/ADR-002-postgres-over-dynamodb.md#item-10-amendment--2026-09-18-author-approved).
+Item 9's writer and signed envelope remain unchanged. New reads and exports do not
+append audit events or mutate household state. No dependencies or migrations added.
+
+Local Darwin arm64, Python 3.12.13, PostgreSQL 16 from the existing local Compose
+stack, SQLAlchemy 2.0.54, cryptography 50.0.1, rfc8785 0.1.4, pytest 9.1.1.
+Native Dogwood is the existing pinned `.tools/dogwood` binary (`dogwood 1.0.0`).
+Commands used `UV_CACHE_DIR=/private/tmp/hirz-uv-cache` and
+`HIRZ_DOGWOOD="$PWD/.tools/dogwood"`. Live database and full-suite checks ran with
+sandbox escalation for local database/socket access. Every integration test and
+the smoke used its own disposable database; existing credentials and the local
+household database were preserved.
+
+### Checks and outputs
+
+```text
+uv run --locked pytest tests/unit/test_audit.py --no-cov
+45 passed in 0.97s
+
+uv run --locked pytest tests/integration/test_audit_database.py -m integration --no-cov -s
+100 concurrent tasks; connection cap=20; 100 contiguous signed rows; snapshot=100; next snapshot=101
+8 passed in 11.89s
+
+uv run --locked ruff check .
+All checks passed!
+uv run --locked ruff format --check .
+80 files already formatted
+uv run --locked mypy hirz/ scripts/ alembic/
+Success: no issues found in 39 source files
+
+uv run --locked pytest
+530 passed, 32 deselected in 61.21s (0:01:01)
+Required test coverage of 80% reached. Total coverage: 86.39%
+
+uv run --locked pytest -m integration --no-cov
+32 passed, 530 deselected in 27.09s
+```
+
+The final full runs include the follow-up assertions that offline CLI verification
+never calls configuration/database helpers, that the snapshot transaction reports
+`read_only=on` and `repeatable read`, and that encoding failures retain a valid
+failure sequence. The service-free coverage figure deliberately excludes live
+PostgreSQL execution; the separate integration suite exercises that path.
+
+The concurrency gate launches 100 distinct real pipeline proposals behind a start
+event through a pool capped at 20 connections, using native Dogwood and the existing
+graph/pointer transaction locks. All returned audit IDs are unique and map to the
+correct action and serialized `Decision.audit_id`; sequences are exactly 1–100.
+The verifier checks every envelope hash/signature and final pointer. A further
+proposal commits after the verifier captures its snapshot/pointer and before its
+row scan. That scan still verifies 100 rows and selects rows 20–40 (21 rows); the
+next snapshot verifies 101. This is a contiguity test, not a throughput benchmark
+or a claim of 100 simultaneously connected database writers.
+
+Adversarial checks cover payload/metadata mutations, rehashing without a valid
+signature, wrong household/key, malformed keys/signatures/encodings/types, unknown
+versions/fields, duplicate JSON keys, missing/duplicated/reordered rows, backwards
+timestamps, genesis/hash/pointer corruption, out-of-range selection and corruption
+outside the requested export interval. File tests verify mode `0600`, preservation
+of existing files, symlink refusal, and removal after an injected partial-write
+failure. CLI tests verify exit statuses and withholding private upstream/payload
+details. Existing empty households and zero pointers pass as empty; unknown homes
+and missing nonempty-chain pointers fail.
+
+### Runnable CLI smoke
+
+```text
+uv run --locked python scripts/smoke_pipeline.py --audit
+evaluate=ASK_CONSTITUTION audit=None
+propose=ASK_CONSTITUTION; vote=APPROVED
+redeem=EXECUTE; boundary=dogwood-local; reserved=0.25
+replay=DENY_APPROVAL_USED; committed_grants=1; device_operations=0
+stored_seed=unvalidated; source=twin; public_authentication=not_implemented
+audit_smoke=PASS; whole_export=valid; range=2:3; changed_row=rejected; device_operations=0
+```
+
+The harness ran actual CLI argument parsing/dispatch with only its database
+connection factory redirected to the disposable database. It then ran independent
+installed `hirz` processes from a temporary directory without `.env` for offline
+verification. The full stdout contained these JSON result fields:
+
+| Operation | Status | Checked range/count | Additional result |
+|---|---|---|---|
+| Database verification | `valid` | 1–5 / 5 | `.env` public key derivation |
+| Whole export | `valid` | 1–5 / 5 | 5 exported; explicit public-key PEM |
+| Range export `2:3` | `valid` | 1–5 / 5 | 2 exported; endpoints 2–3 |
+| Offline whole file, trusted PEM | `valid` | 1–5 / 5 | no `.env` or database |
+| Offline range, trusted fingerprint | `valid` | 2–3 / 2 | no `.env` or database |
+| Same range after payload mutation | `invalid` | none / 0 | `failure_seq: 2`, `reason: Envelope hash mismatch`; exit 1 |
+
+Every output included `not anchored: local mode` and the completeness, truncation,
+erasure and re-signing limitations. Temporary exports and the smoke database were
+removed; nothing executed on a device. The original pipeline smoke behavior also
+passed before its new audit extension ran.
+
+### Failures encountered and limits
+
+The first unit collection failed because an argparse generic annotation was
+evaluated at runtime (`TypeError: type '_SubParsersAction' is not subscriptable`);
+postponed annotations fixed it. The first concurrency test had already verified
+100 rows, then failed when its snapshot hook tried assigning an instance method
+(`AttributeError: 'AsyncConnection' object attribute 'stream' is read-only`);
+patching the class in the test fixed that. An indentation error introduced while
+editing this hook was caught by Ruff and fixed before rerunning. These were our
+implementation/test mistakes, not third-party defects. The friction log was
+reviewed; no new qualifying friction entry was earned.
+
+The audit threat-model row earns **Partial** only. Signatures/link checks do not
+detect a valid tail-and-pointer rollback, complete erasure, or history re-signed
+with the worker's key. Selected exports prove only included rows and internal
+links, not omitted history or freshness. The unsigned wrapper cannot attest
+completeness. An empty result proves no historical absence. Anchors and
+`--anchors` remain item 38b; public endpoints/authentication, policy activation,
+physical execution and AWS enforcement remain pending. Item 11 owns `hirz decide`.
+No commit, push, deployment or new GitHub Actions run was performed or claimed.

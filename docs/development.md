@@ -210,4 +210,73 @@ For the real database checks, `uv run --locked pytest -m integration --no-cov` u
 uniquely named disposable databases, including upgrade/downgrade and metadata agreement.
 The internal service does not expose `hirz decide` (item 11), authentication, activation,
 physical execution (item 19), or AWS enforcement. Audit append is available internally;
-`verify-audit`, export, and the 100-concurrent-decision gate remain item 10.
+audit verification/export procedures follow below.
+
+## Audit verification and export (item 10)
+
+Run database commands from the checkout root with the existing initialized `.env`
+and migrated PostgreSQL. These are local operator commands, not public authenticated
+API endpoints. Use a household UUID from the seed/context output:
+
+```sh
+uv run --locked hirz verify-audit --household "$HOUSEHOLD_ID"
+uv run --locked hirz audit export --household "$HOUSEHOLD_ID" --output audit.json
+# Choose an interval that exists in this household; endpoints are inclusive.
+uv run --locked hirz audit export --household "$HOUSEHOLD_ID" --range 2:3 --output audit-range.json
+```
+
+Exports refuse existing paths and are created with mode `0600`. They include
+unchanged signed payloads and may contain household information; there is no
+redaction mode. Even a range export checks the entire household chain first.
+For command/result and file-format semantics, see
+[architecture §5.10](../ARCHITECTURE.md#510-audit-ledger).
+
+To obtain the public key and fingerprint directly from your own trusted local
+installation, run the following in the checkout. It prints only public material;
+it never generates or replaces a signing key:
+
+```sh
+uv run --locked python - <<'PY'
+from pathlib import Path
+from hirz.audit import fingerprint, public_pem
+from hirz.local import read_env, signing_key
+key = signing_key(read_env(Path('.env'))).public_key()
+print(public_pem(key), end='')
+print('Fingerprint:', fingerprint(key))
+PY
+```
+
+Save just the PEM block as `trusted-public.pem` or retain the fingerprint, and
+transfer that trust information separately from an untrusted export. Database
+commands may use `--public-key trusted-public.pem` without loading the private
+key; they still need `.env` for database credentials. Do not accept a key simply
+because it was embedded in the file being checked.
+
+Offline verification needs the installed Hirz CLI but neither PostgreSQL nor `.env`:
+
+```sh
+hirz verify-audit --household "$HOUSEHOLD_ID" --file audit.json --public-key trusted-public.pem
+hirz verify-audit --household "$HOUSEHOLD_ID" --file audit-range.json --trusted-fingerprint "$TRUSTED_FINGERPRINT"
+```
+
+Both commands return JSON and nonzero exit status on failure. `empty` is a
+successful check of an empty chain, not proof that history never existed.
+`--anchors` is not implemented; all results state the local anchoring limitation.
+Do not repair rows, reset pointers or replace keys to make verification pass.
+Preserve the original evidence and restore the original key when it is missing.
+
+Run the disposable end-to-end example and concurrency check with:
+
+```sh
+export HIRZ_DOGWOOD="$PWD/.tools/dogwood"
+uv run --locked python scripts/smoke_pipeline.py --audit
+uv run --locked pytest tests/integration/test_audit_database.py -m integration --no-cov -s
+```
+
+The smoke extends the existing internal pipeline example. It substitutes only the
+CLI's connection factory to target its uniquely named disposable database (the
+local CLI deliberately has no database-selection flag); parsing, verification,
+file writing, and cryptography are real. Offline commands run as separate installed
+CLI processes in a temporary directory without `.env`. It verifies full and range
+exports, changes one exported payload, asserts rejection, and removes only its
+temporary files and database. No device operation or live-household mutation occurs.

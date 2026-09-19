@@ -1,4 +1,4 @@
-"""Transactional signed append only. Verifier/export remain item 10."""
+"""Transactional signed append; read-only verification/export live in hirz.audit."""
 
 import hashlib
 from datetime import datetime

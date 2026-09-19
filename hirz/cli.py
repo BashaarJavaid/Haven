@@ -12,6 +12,7 @@ from uuid import UUID
 import httpx
 import sqlalchemy as sa
 
+from hirz.audit.cli import add_commands, audit_command, validate_args
 from hirz.constitution.cli import constitution_command
 from hirz.db import connect_database, require_current
 from hirz.graph.context import ContextService
@@ -134,6 +135,7 @@ async def graph_command(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    add_commands(commands)
     commands.add_parser(
         "doctor", help="Check local services, signing key, and migrations"
     )
@@ -156,6 +158,9 @@ def main() -> int:
     preview.add_argument("old", type=Path)
     preview.add_argument("new", type=Path)
     args = parser.parse_args()
+    if args.command in {"audit", "verify-audit"}:
+        validate_args(args, parser)
+        return asyncio.run(audit_command(args))
     if args.command == "constitution":
         return asyncio.run(constitution_command(args))
     if args.command == "context" and (args.scope == "member") != (

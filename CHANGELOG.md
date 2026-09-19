@@ -13,6 +13,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- 2026-09-18: Phase 1 item 10: read-only audit verification, private sequence-range
+  exports and offline verification with independently trusted public keys.
+  [Contract and tradeoffs](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-10-amendment--2026-09-18-author-approved);
+  [verification and limitations](./docs/verification-log.md#item-10--complete-2026-09-18).
+
 - 2026-09-18: Phase 1 item 9: deterministic internal pipeline, durable single-use
   execution grants, persisted quorum approvals, exact daily budget reservations,
   and atomic household pause/resume. Signed audit append is pulled forward from

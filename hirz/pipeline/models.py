@@ -214,3 +214,19 @@ class Decision(Model):
     budget: BudgetEvidence | None = None
     explain: Explanation = Explanation()
     audit_id: int | None = None
+
+
+class AuditEvent(Model):
+    """The stored signed row; payloads remain opaque canonical JSON objects."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    household_id: UUID
+    seq: int = Field(gt=0)
+    event_type: str = Field(min_length=1)
+    payload: dict[str, JsonValue]
+    prev_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    curr_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    key_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    signature: bytes = Field(min_length=1)
+    created_at: AwareDatetime

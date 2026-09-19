@@ -103,3 +103,47 @@ Canonicalization uses the approved [Trail of Bits RFC 8785 implementation](https
 not `canonicaljson` (which was incorrectly named as RFC 8785). Exact envelope and
 hashing contracts are in [architecture §3.4 and §5.10](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
 Neither migrations nor the pipeline initialize or replace signing credentials.
+
+## Item 10 amendment — 2026-09-18 (author-approved)
+
+Keep the item 9 writer in place and implement the independent read path under
+`hirz.audit`, sharing the canonical AuditEvent and existing RFC 8785 hashing.
+Verification never re-runs policy. A read-only `REPEATABLE READ` transaction keeps
+the household, pointer and streamed rows in one snapshot while appends continue;
+PostgreSQL documents that successive reads see the same snapshot and read-only
+transactions at this isolation level do not incur serialization conflicts
+([PostgreSQL 16](https://www.postgresql.org/docs/16/transaction-iso.html#XACT-REPEATABLE-READ)).
+No migration, dependency or writer-lock change is needed.
+
+Commands select one explicit household. Exports first verify the full chain, then
+include only an inclusive sequence interval in a versioned JSON file. The caller
+supplies an independent public key or fingerprint for offline verification; an
+embedded key alone is not a trust root. Database commands may derive the public
+key from the existing validated local key. The exact format and verification
+contract live in [architecture §5.10](../../ARCHITECTURE.md#510-audit-ledger).
+
+Alternatives rejected:
+
+- All-household defaults and time-range selectors: explicit household and sequence
+  numbers directly match the existing chain and avoid additional selection modes.
+- Prefix-inclusive exports: disclose history outside the requested interval. A
+  selected-range export instead states precisely which links it can verify.
+- File-only trust or automatic acceptance of an embedded key: could accept an
+  attacker's replacement key and rewritten history. PEM-only verification was
+  rejected in favor of also accepting an independently obtained fingerprint.
+- Selected-range-only database checks: could export evidence from a household
+  whose wider chain is already known to be corrupted.
+- JSON Lines, stdout exports and fully streamed JSON publication: not needed for
+  the current household workload. Selected rows occupy memory; stream publication
+  if measured export sizes outgrow RAM. Exclusive private file creation avoids
+  overwriting another file or relying on shell redirection permissions.
+- Moving the writer or adding key rotation, signed export manifests, or anchors:
+  unnecessary to this item. The current one-key chain contract stays unchanged;
+  S3 anchors remain item 38b.
+
+The concurrency gate launches 100 distinct pipeline proposals with a 20-connection
+pool cap; the existing global transaction lock remains intentional. This tests
+contiguity under concurrent requests, not 100 simultaneous database writers or a
+throughput target. Signature/link checks earn only a Partial tampering claim:
+tail-and-pointer rollback, complete erasure and a compromised worker re-signing
+history remain undetectable without independently held evidence.

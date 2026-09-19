@@ -291,6 +291,13 @@ Boundary evidence includes a context hash and the result for each evaluated role
 
 Append-only, hash-chained, ECDSA-signed rows (§5.10). Every `Decision`, approval transition, execution, verification, constitution activation, and memory proposal is one row. The row's `payload` is the canonical object above; `prev_hash`, `curr_hash`, `signature`, `key_fingerprint` make the chain independently verifiable with `hirz verify-audit`.
 
+`hirz.pipeline.models.AuditEvent` is the canonical stored row: `household_id` (UUID),
+`seq` (positive integer), `event_type` (nonempty string), `payload` (JSON object),
+`prev_hash`, `curr_hash`, `key_fingerprint` (64 lowercase hexadecimal characters),
+`signature` (DER bytes), and `created_at` (timezone-aware timestamp). Verification
+preserves payload values and accepts event names without re-running policy or
+requiring the current code to understand a historical event's payload.
+
 ### 4.5 VerificationCase (Protect)
 
 ```json
@@ -533,8 +540,54 @@ with DER signatures and a SHA-256 DER SubjectPublicKeyInfo fingerprint. Sequence
 allocated before serializing `Decision.audit_id`. Append and pointer update share
 the pipeline transaction, with zero-hash genesis; incompatible keys and invalid
 pointer state are refused. Credentials are never initialized by the pipeline.
-Verifier/export and the 100-concurrent-decision gate remain item 10; anchors remain
-item 38b. Only the append dependency was pulled forward.
+Only the append dependency was pulled forward. Item 10 supplies read-only
+verification/export below; anchors remain item 38b.
+
+**Item 10 verification and export.** `hirz.audit` supplies a shared streaming row
+verifier for PostgreSQL and offline files. Database reads use one read-only
+`REPEATABLE READ` transaction, checking household existence, genesis, contiguous
+sequences, previous hashes, nondecreasing timestamps, canonical envelope hashes,
+trusted public-key fingerprints, signatures and final pointer agreement. There
+are no writer locks or audit writes. An existing empty household permits either
+no pointer or the zero pointer and reports `empty`, not proof of historical absence.
+Unknown households, missing nonempty-chain pointers and mismatching pointers fail.
+
+`audit export` verifies the entire household snapshot before creating a file, even
+for a selected interval. `--range START:END` uses inclusive positive sequence
+numbers; omission selects the entire chain. Out-of-bounds and reversed ranges
+fail. Only selected rows are exported. They occupy memory proportional to the
+selected interval; database verification itself streams rows.
+
+The JSON file contains exactly `format_version: 1`, `household_id`, `start_seq`,
+`end_seq`, `public_key` (PEM SubjectPublicKeyInfo) and `rows`. Rows use the canonical
+AuditEvent fields, with canonical UUID strings, UTC timestamps with six fractional
+digits and `Z`, and standard base64 DER signatures. Payloads are unchanged, not
+redacted. Empty exports have an empty row list and null endpoints. The wrapper is
+unsigned; endpoints must match the included rows and do not prove completeness.
+Duplicate JSON keys, extra fields, unsupported versions, malformed types and
+encodings fail. Output is created exclusively with mode `0600`; existing paths
+and symlinks are refused, and failed writes remove the newly created file.
+
+All commands require `--household UUID`. Database verification and export accept
+`--public-key PEM`, otherwise deriving the public key from the existing validated
+local signing key; neither initializes credentials. Offline `verify-audit --file`
+requires exactly one of `--public-key PEM` or `--trusted-fingerprint HEX` from an
+independent trusted source and never reads `.env` or connects to PostgreSQL. The
+file's household must match the explicitly expected household. Partial exports
+prove included signatures and internal links only; genesis is checked when present.
+
+CLI results are JSON with `status` (`valid`, `empty`, `invalid`), household, checked
+range/count, fingerprint, first failure sequence/reason and anchoring limitation.
+Export results additionally identify the exported range/count; the checked range
+remains the entire database chain. Exit codes are 0 for valid/empty, 1 for integrity
+or operational failure, and 2 for usage errors. Errors never disclose payloads,
+credentials or upstream details. `--anchors` is unsupported until item 38b.
+
+Every result reports `not anchored: local mode`: omitted history, later rows and
+completeness are unproven. Removing a tail together with resetting its pointer,
+erasing the entire chain, or rewriting and re-signing with the worker's key cannot
+be excluded by this verifier. The threat-model claim is Partial, not prevention of
+all database tampering. Trust and format choices: [ADR-002](./docs/adr/ADR-002-postgres-over-dynamodb.md#item-10-amendment--2026-09-18-author-approved).
 
 **Anchoring.** The worker holds the signing key and database write access, so a compromised worker could rewrite the chain and re-sign it; the chain alone is tamper-evident only against an attacker who has the database. In AWS mode the chain head (`seq`, `curr_hash`, timestamp) is therefore written hourly, and on every `CONSTITUTION_ACTIVATED`, to an S3 bucket with Object Lock in governance mode (retention through the judging window; compliance mode would block `cdk destroy`). The worker's role has put-only access to that bucket. `hirz verify-audit --anchors` compares the chain with the anchors and detects any rewrite of history before the last anchor; each anchor is also an `AUDIT_ANCHORED` row. Local mode records "not anchored: local mode". Per-row signing stays on the local key: a KMS call per row would sit inside the audit write path and the latency budget, add a fail-closed dependency, and still sign whatever a compromised worker asked for.
 

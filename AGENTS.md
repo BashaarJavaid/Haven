@@ -80,7 +80,8 @@ Item 6 also supplies explicit demo seeding and redacted context reads. Item 7 ad
 read-only constitution validation, compilation, and preview; native Dogwood setup
 is in `docs/development.md`. Item 8 adds standalone Python risk scoring; its API
 smoke procedure is also in `docs/development.md`. Item 9 adds the internal pipeline API and disposable `scripts/smoke_pipeline.py`
-example; signed append is internal only. The other commands below remain target state.
+example; signed append is internal only. Item 10 adds audit verification/export and
+the smoke's `--audit` option; anchors remain item 38b. The other commands below remain target state.
 The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 - `uv sync` — install Python deps; `pnpm install` — install workspaces.
@@ -95,7 +96,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 - `uv run hirz doctor` — four read-only local checks: Postgres, HA demo entities, P-256 signing probe, migration head/table/materialized-view presence. Exit 0 only if all pass; no `--aws` or constitution check yet. Those checks remain target state.
 - `uv run hirz decide --action energy.hvac_adjust --params '{"zone":"living_room","target_f":72}' --as malik` — dry-run the pipeline.
 - `uv run hirz scenario run scenarios/demo-evening.yaml --speed 60` — interactive; `--headless --assert` — CI; `--step --to "18:16"` — pause for recording.
-- `uv run hirz verify-audit` (`--anchors` also checks the S3 anchors in AWS mode) / `uv run hirz audit export --range ...` — audit chain.
+- `uv run hirz verify-audit --household <uuid>` / `uv run hirz audit export --household <uuid> [--range START:END] --output <new-file>` — full-chain verification and private exports. Offline: `hirz verify-audit --household <uuid> --file <export> --public-key <pem>` (or `--trusted-fingerprint <hex>`). `--anchors` remains item 38b; procedures in `docs/development.md`.
 - `docker compose -f compose.link.yml up -d` — Hirz Link beside Home Assistant, in the home (AWS mode).
 - `uv run python scripts/backtest.py` — the year-long rate-plan backtest every published savings figure comes from.
 - `uv run python scripts/build_dogwood.py` — build the pinned native CLI (Rust/Cargo required); `export HIRZ_DOGWOOD="$PWD/.tools/dogwood"` enables local checks.
@@ -110,7 +111,7 @@ The verified toolchain and scaffold setup are in `README.md`; use Node 24.
 
 ## Current phase
 
-**Phase 0 and Phase 1 items 6–9 are complete and verified locally; item 10's audit verifier/export is next.** Internal Decisions, approvals, budget reservations, pause/resume and signed grants pass native Dogwood and PostgreSQL checks. Stored seeds remain unvalidated; public authentication, activation, physical execution and AWS enforcement are pending. Item 11 still owns `hirz decide`. Evidence: `docs/verification-log.md`; API smoke: `docs/development.md`. Four CI jobs remain placeholders.
+**Phase 0 and Phase 1 items 6–10 are complete and verified locally; item 11 (`hirz decide`) is next.** Audit verification/export and internal grants pass native Dogwood and PostgreSQL checks; audit tampering protection is Partial without anchors. Stored seeds remain unvalidated; public authentication, activation, physical execution and AWS enforcement are pending. Evidence: `docs/verification-log.md`; procedures: `docs/development.md`. Four CI jobs remain placeholders; item 10 has no new CI run.
 
 ---
 
