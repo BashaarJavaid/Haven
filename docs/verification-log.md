@@ -185,9 +185,13 @@ Direct model/policy probe, run with `uv run python -`:
 ```python
 from hirz.graph.models import ObservationState
 from hirz.constitution.conditions import attribute
+
 state = ObservationState(soc=0.1 + 0.2, temp_f=71.123456)
 print(state.model_dump_json(exclude_none=True))
-print('policy temp_f:', attribute({'asset': {'state': state.model_dump()}}, 'asset.state.temp_f'))
+print(
+    "policy temp_f:",
+    attribute({"asset": {"state": state.model_dump()}}, "asset.state.temp_f"),
+)
 ```
 
 Output:
