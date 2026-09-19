@@ -389,6 +389,86 @@ profiles are identical after excluding the added freshness field. Comparing
 `AGENTS.md` and `CLAUDE.md` from `## Project` onward confirmed matching bodies.
 
 
+### Missing HVAC baseline and exception-class logging — 2026-09-18
+
+Applied the [author-approved baseline amendment](./adr/ADR-004-no-ml-risk-scoring.md#missing-hvac-baseline-amendment--2026-09-18-author-approved).
+No seed, canonical factor literal, dependency, instruction-file or Phase 2 change.
+The four failure logs from `de074cf` now record operation and exception class,
+plus household ID for the pipeline, without exception text or traceback.
+
+Environment: Darwin arm64, Python **3.12.13**, uv **0.12.15**, pytest **9.1.1**,
+native Dogwood **1.0.0**. Commands ran from the checkout on `phase-1`, with
+`UV_CACHE_DIR=/private/tmp/hirz-uv-cache`. Database commands and full suites used
+sandbox escalation for existing local PostgreSQL and disposable loopback tests.
+The preview used `HIRZ_DOGWOOD="$PWD/.tools/dogwood"`; tests discovered that binary
+through the existing `tests/conftest.py`. Local date is 2026-09-18; the CLI clock
+below is UTC on 2026-09-19.
+
+Commands and exact final outputs (all exit 0):
+
+```text
+$ uv run pytest tests/unit/test_risk.py tests/unit/test_pipeline.py::test_connection_failure_logs_household_without_params --no-cov -q
+281 passed in 0.88s
+
+$ uv run ruff check . && uv run ruff format --check . && uv run mypy hirz/ scripts/ alembic/
+All checks passed!
+84 files already formatted
+Success: no issues found in 40 source files
+
+$ uv run pytest
+Required test coverage of 80% reached. Total coverage: 86.51%
+================ 564 passed, 47 deselected in 60.40s (0:01:00) =================
+
+$ uv run pytest -m integration --no-cov
+===================== 47 passed, 564 deselected in 36.72s ======================
+```
+
+The service-free suite includes native Dogwood conformance; risk engine line
+coverage is **100%** (76 statements). No failing test runs occurred in this task.
+Existing tests changed:
+
+- `test_missing_required_facts_fail_closed`: removed only the HVAC baseline case,
+  which asserted the superseded CRITICAL contract; other missing facts still deny.
+- `test_invalid_action_parameter_fails_closed`: runs missing/null/nonnumeric targets
+  with both a stored and null baseline, proving target validation is retained.
+- `test_connection_failure_logs_household_without_params`: expects the message to
+  end with `error=RuntimeError`; existing sentinel exclusions remain intact.
+
+New `test_hvac_without_baseline_has_no_deviation` covers both omitted and explicit
+null baselines, asserting LOW and no factors with otherwise clean inputs. Existing
+`test_factor_applicability` (72 °F target, 65 °F baseline) and
+`test_deviation_exact_boundary` continue to prove >6 °F raises deviation risk.
+
+Development database commands:
+
+```sh
+uv run hirz context 536fa8ee-854e-56ca-8c5d-5ba418e710a0 --scope all
+uv run hirz decide --household 536fa8ee-854e-56ca-8c5d-5ba418e710a0 --as malik --surface alexa --action energy.hvac_adjust --adapter twin --entity hvac.living_room --zone 1573afea-10d3-52a1-92cc-36121a6dbbb0 --params '{"target_f":72}'
+```
+
+The context returned living-room HVAC zone
+`1573afea-10d3-52a1-92cc-36121a6dbbb0` and **0 observations**. Full `decide` stdout:
+
+```json
+{"decision":"deny","event_type":"DENY_RISK","action_id":"act_8fade72f0d1a4fa990eb887e6077ca90","risk":{"band":"critical","base_band":"low","factors":[{"factor":"scoring_error","effect":"→ CRITICAL","evidence":"Missing required fact: sleeping_in_target_zone."}]},"constitution":{"version":7,"rule":"energy.hvac_adjust","mode":"ask","conditions_met":false},"boundary":{"engine":"dogwood-local","result":"not_evaluated","reason":"terminal before boundary","context_hash":null,"roles":{}},"approval":null,"budget":null,"explain":{"facts":[],"considered":[],"rejected":[]},"audit_id":null}
+```
+
+Full stderr:
+
+```text
+Hypothetical dry run; policy v7 is unactivated (stored: unvalidated); clock=2026-09-19T04:11:32.112578+00:00; current graph, not historical replay. No authentication, approval, execution grant, device operation, or audit write. Supplied evidence is simulated; boundary is dogwood-local.
+```
+
+The expected `DENY_RISK` names `sleeping_in_target_zone` in `scoring_error`, not
+`baseline_target_f`. The preview remains hypothetical and the stored policy
+unactivated; this does not claim successful pre-warming or device execution.
+The isolated unit checks prove the baseline exception independently of the
+seed's missing observations. No development graph or seed data was changed.
+
+`git diff --check` passed. Friction log reviewed: existing documented cache/socket
+setup was used successfully; no new third-party error, delay or workaround earned
+an entry. No remote CI run, push, AWS work, activation or Phase 2 work was performed.
+
 ## Item 9 — Complete (2026-09-18)
 
 ### Scope and environment

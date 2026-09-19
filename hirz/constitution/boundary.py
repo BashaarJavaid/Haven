@@ -100,7 +100,7 @@ class Dogwood:
                     await process.wait()
                 if isinstance(exc, BoundaryError):
                     raise
-                log.exception("Dogwood.run", exc_info=False)
+                log.error("Dogwood.run error=%s", type(exc).__name__)
                 raise BoundaryError(
                     "Dogwood unavailable, timed out, or returned invalid output; no authorization"
                 ) from None

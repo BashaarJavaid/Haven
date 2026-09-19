@@ -159,7 +159,9 @@ def test_connection_failure_logs_household_without_params(caplog):
             await p.evaluate(a, PRINCIPAL)
         record = caplog.records[-1]
         assert record.name == "hirz.pipeline.service"
-        assert record.getMessage() == f"Pipeline.evaluate household={HOME}"
+        assert record.getMessage() == (
+            f"Pipeline.evaluate household={HOME} error=RuntimeError"
+        )
         assert sentinel not in caplog.text
         assert sentinel not in repr(record.__dict__)
 

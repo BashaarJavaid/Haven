@@ -125,9 +125,8 @@ def score(
             target = number(
                 required(action.params.get("target_f"), "action.params.target_f")
             )
-            baseline = required(facts.baseline_target_f, "baseline_target_f")
-            deviation = abs(target - baseline)
-            if deviation > 6:
+            baseline = facts.baseline_target_f
+            if baseline is not None and (deviation := abs(target - baseline)) > 6:
                 add(
                     RiskFactor(
                         factor="deviation_from_baseline",

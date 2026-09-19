@@ -8,6 +8,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- 2026-09-18: Missing HVAC baselines skip deviation scoring without weakening
+  other required facts ([ADR-004 amendment](./docs/adr/ADR-004-no-ml-risk-scoring.md#missing-hvac-baseline-amendment--2026-09-18-author-approved));
+  pipeline and boundary failure logs include the exception class without payloads
+  ([verification](./docs/verification-log.md#missing-hvac-baseline-and-exception-class-logging--2026-09-18)).
+
 - 2026-09-18: Closed item 11 after the authorized empty-audit development schema
   reset and reseed; [verification](./docs/verification-log.md#development-database-reset-and-phase-1-review--2026-09-18).
 - 2026-09-18: Phase 1 review: tests discover the local Dogwood binary, pipeline

@@ -68,3 +68,25 @@ Only `finance.verify_request` maps CRITICAL to VERIFY, which creates no contact
 operation. Automatic risk inference from names, incomplete occupancy, or ambiguous
 temperature preferences was rejected; the pipeline's extraction contract is in
 [architecture §3.4](../../ARCHITECTURE.md#34-internal-pipeline-contract-item-9).
+
+## Missing HVAC baseline amendment — 2026-09-18 (author-approved)
+
+**Decision:** A missing/null `baseline_target_f` is not applicable, not an
+unknown required fact. HVAC scoring skips `deviation_from_baseline` without
+adding a factor when no baseline exists. `action.params.target_f` remains
+required and numeric; every other applicable required fact still fails closed
+to CRITICAL when missing. Supplied baselines retain the >6 °F deviation factor.
+The canonical factor set and demo seeds are unchanged.
+
+**Reasoning:** A missing preference is missing information, not a hazard. The
+previous CRITICAL behavior denied instead of asking and blocked any new member
+without a stored preference from the thermostat, including Malik's demo pre-warm.
+
+**Rejected alternatives:**
+
+- Keep CRITICAL: it treats absence of a preference as a hazard and prevents
+  thermostat use by members who have not saved a preference.
+- Add a +1 `state_stale`-style factor: absence of a preference is neither stale
+  device state nor evidence of increased risk.
+- Seed preferences for everyone: it hides the contract problem and leaves newly
+  added members subject to the same denial.

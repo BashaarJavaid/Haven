@@ -453,11 +453,12 @@ instances created through validation-bypassing helpers. Its fields are:
 | `sleeping_in_target_zone`, `sleeping_any`, `target_is_bedroom` | Strict Boolean occupancy/zone facts; only applicable sleep predicates are required |
 | `guest_present` | Strict Boolean, required only for the three security classes in the table; not `security.arm_disarm` |
 | `doorbell_online` | Strict Boolean, required for door unlock; false contributes `state_stale` |
-| `baseline_target_f` | Resolved requester's temperature preference, required for HVAC; uses the existing constitution Decimal validation |
+| `baseline_target_f` | Resolved requester's temperature preference; missing/null skips HVAC deviation as not applicable; supplied values use the existing constitution Decimal validation |
 | `scam_pattern` | Strict Boolean from trusted deterministic code, required only for the four classes in the table; never model-assisted advice |
 
-Missing/null fields stay unknown; applicable unknowns produce CRITICAL, while
-irrelevant fields may be omitted. Invalid supplied fields fail validation even
+Missing/null fields stay unknown and applicable unknowns produce CRITICAL, except
+missing/null `baseline_target_f` skips deviation as not applicable; irrelevant
+fields may be omitted. Invalid supplied fields fail validation even
 when irrelevant. The resolved Action role alone determines `unknown_requester`;
 names, speaker hints, and missing member IDs do not independently trigger it.
 The caller owns household scope, rule selection, the complete observation set,

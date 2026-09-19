@@ -322,7 +322,6 @@ def test_forced_critical_keeps_later_bounds():
     [
         ("energy.ev_charge", "observation_ages_seconds", {}),
         ("energy.hvac_adjust", "sleeping_in_target_zone", {}),
-        ("energy.hvac_adjust", "baseline_target_f", {}),
         ("energy.appliance_start", "sleeping_any", {}),
         ("environment.lights", "target_is_bedroom", {}),
         ("environment.lights", "sleeping_in_target_zone", {"target_is_bedroom": True}),
@@ -342,6 +341,14 @@ def test_missing_required_facts_fail_closed(name, field, changes):
     assert result.band == "critical"
     assert names(result)[-1] == "scoring_error"
     assert field in result.factors[-1].evidence
+
+
+@pytest.mark.parametrize("baseline", [{}, {"baseline_target_f": None}])
+def test_hvac_without_baseline_has_no_deviation(baseline):
+    inputs = facts()
+    del inputs["baseline_target_f"]
+    result = score(action("energy.hvac_adjust"), inputs | baseline, Rule(mode="auto"))
+    assert result.band == "low" and result.factors == ()
 
 
 def test_irrelevant_missing_fields_and_known_empty_observations():
@@ -392,9 +399,10 @@ def test_malformed_facts_fail_closed_without_echo(changes):
         {"target_f": float("inf")},
     ],
 )
-def test_invalid_action_parameter_fails_closed(params):
+@pytest.mark.parametrize("baseline", [72, None])
+def test_invalid_action_parameter_fails_closed(params, baseline):
     a = action("energy.hvac_adjust").model_copy(update={"params": params})
-    result = score(a, facts(), Rule(mode="auto"))
+    result = score(a, facts(baseline_target_f=baseline), Rule(mode="auto"))
     assert result.band == "critical" and names(result)[-1] == "scoring_error"
     assert "secret" not in result.model_dump_json()
 

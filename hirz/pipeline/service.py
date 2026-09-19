@@ -515,11 +515,13 @@ class Pipeline:
                 if ev.decision.decision == "execute":
                     ev = await self.boundary_check(ev, utc(self.clock()))
                 return ev.decision
-        except Exception:
+        except Exception as exc:
             await self.connection.invalidate()
             await self.connection.rollback()
-            log.exception(
-                "Pipeline.evaluate household=%s", self.household_id, exc_info=False
+            log.error(
+                "Pipeline.evaluate household=%s error=%s",
+                self.household_id,
+                type(exc).__name__,
             )
             raise PipelineError(
                 "Pipeline evaluation failed; no authorization returned"
@@ -822,8 +824,10 @@ class Pipeline:
             await self.connection.rollback()
             if isinstance(exc, PipelineError):
                 raise
-            log.exception(
-                "Pipeline.mutate household=%s", self.household_id, exc_info=False
+            log.error(
+                "Pipeline.mutate household=%s error=%s",
+                self.household_id,
+                type(exc).__name__,
             )
             raise PipelineError(
                 "Pipeline transaction failed; no authorization returned"
@@ -1097,8 +1101,10 @@ class Pipeline:
             await self.connection.rollback()
             if isinstance(exc, PipelineError):
                 raise
-            log.exception(
-                "Pipeline.vote household=%s", self.household_id, exc_info=False
+            log.error(
+                "Pipeline.vote household=%s error=%s",
+                self.household_id,
+                type(exc).__name__,
             )
             raise PipelineError(
                 "Pipeline transaction failed; no authorization returned"
